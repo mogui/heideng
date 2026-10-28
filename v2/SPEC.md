@@ -364,7 +364,7 @@ Every sandboxed execution belongs to a scope. The scope owns a `HOME` and the on
 | Scope | `HOME` | Executions | Lifetime |
 |---|---|---|---|
 | build | `work/runs/<run>/home/` | implement, plan, review, docs, report, the test and host steps, merge | the run |
-| verify | `holdout/runs/<run>/verify/r<n>/home/` | `build`, `start`, `ready` and check `run` in verify, baseline and regression | the step |
+| verify | `holdout/runs/<run>/verify-work/r<n>/home/` | `build`, `start`, `ready` and check `run` in verify, baseline and regression | the step |
 | holdout | `holdout/home/` | holdout-gen, oracle | until the checks change |
 
 The accept and resolve sessions belong to no scope: they run with the person, outside the sandbox, with the person's `HOME` and Claude Code config. The engine marks their staging folder as trusted in the person's `.claude.json` (`projects[<folder>].hasTrustDialogAccepted`), so the session opens without the trust dialog.
@@ -414,7 +414,7 @@ A red doctor stops before any node, with the failing command and the setting tha
 
 ### Resolve: `heideng resolve <id>`
 
-The person closes an escalation together with an agent, which reads the state files for them.
+The person closes an escalation together with an agent, which reads the state files for them. `heideng resolve` without an id takes every open escalation of the latest run into one session: `escalation.md` holds them all, one closure applies to each, the note is appended to `decisions.md` once, and the staging directory is `state/resolve/<id>+<id>...`.
 
 1. The engine prepares `state/resolve/<id>/` with `escalation.md`, `spec/` (the accepted `spec.md`, `acceptance.md`, `contract.md` and `decisions.md` of `heideng/<slug>`, with the `active/` ACs) and the resolve prompt, and starts an interactive `claude` session there. The session reads the run directory and the holdout checks of the spec where they are.
 2. The agent:
@@ -467,8 +467,8 @@ The person closes an escalation together with an agent, which reads the state fi
   <slug>/, retired/           checks
   doctor/                     cwd and HOME of the doctor probe for the holdout scope
   runs/<run>/
-    verify/r<n>/              disposable checkout and its home/, deleted after verify
-    verify-work/r<n>/         HEIDENG_DATA of the verify scope
+    verify/r<n>/              disposable checkout, deleted after verify
+    verify-work/r<n>/         HEIDENG_DATA and home/ of the verify scope, outside the checkout, deleted after verify
     evidence/<check>/         output of each check run
 ```
 
@@ -532,7 +532,7 @@ Branch heideng/<slug> - round 3 - $27.80 / 50 - 5h12 / 6h - $2.10 per verified A
 | `heideng accept <spec>` | interactive session, accept check, branch and lock |
 | `heideng run <spec>` | runs the pipeline; `--until holdout\|plan\|round\|merge` stops at that boundary |
 | `heideng resume [run]` | continues a stopped run; `--add-usd`, `--add-time`, `--add-passes` |
-| `heideng resolve <id>` | interactive session, resolve check, closure of the escalation, resume on `y` |
+| `heideng resolve [id]` | interactive session, resolve check, closure of the escalation, resume on `y`; without an id, one session and one closure for every open escalation of the latest run |
 | `heideng abort [run]` | stops the engine at once and ends the run as `aborted`, branch unchanged; an aborted run cannot be resumed |
 | `heideng close <run>` | releases the lock; branch and plan stay. `--delete-branch` deletes both and retires the checks |
 | `heideng status` | active run, current node, open escalations |
