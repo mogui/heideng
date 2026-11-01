@@ -240,14 +240,14 @@ One of the two interactive sessions with the person; the other is [resolve](#res
    - extracts the ACs with stable ids, each `auto` (a check can settle it) or `manual` (the person judges it after the run);
    - lists the ACs of active specs this spec modifies or removes, as `<slug>/AC-n`;
    - writes `spec.md`, `acceptance.yaml`, `contract.yaml` and `decisions.yaml` in the directory, in the [file formats](#file-formats);
-   - tells the person to type `/exit` when satisfied.
+   - lists the absolute paths of the four files for the person to review, and tells the person to type `/exit` when satisfied.
 3. When the session ends the engine runs the accept check:
    - ACs: unique ids, `auto` or `manual` on each, every superseded `<slug>/AC-n` exists among the active ACs;
    - contract: the five keys, at least one `requires` entry, `drive.overlay` lists the overlay directories;
    - every `requires` command exits 0 on the host.
 4. With the accept check passed the engine runs [doctor](#doctor).
 5. Errors of either: the engine prints them and `heideng accept <spec>` resumes the same session with the errors as the first message.
-6. Ok: the engine asks `y/n`. On `n` nothing changes and the staging stays for the next `accept`. On `y` it creates `heideng/<slug>` from `main` when it does not exist, and commits on it `spec.md`, `acceptance.yaml`, `decisions.yaml` and `spec.lock` under `.heideng/specs/<slug>/`, and the contract at `.heideng/contract.yaml`. `spec.lock` holds the version, the hashes of the committed files and the superseded ACs.
+6. Ok: the engine prints the absolute paths of the four files and asks `y/n`. On `n` nothing changes and the staging stays for the next `accept`. On `y` it creates `heideng/<slug>` from `main` when it does not exist, and commits on it `spec.md`, `acceptance.yaml`, `decisions.yaml` and `spec.lock` under `.heideng/specs/<slug>/`, and the contract at `.heideng/contract.yaml`. `spec.lock` holds the version, the hashes of the committed files and the superseded ACs.
 
 A lock is valid when its hashes match the committed files. `heideng run` rejects a spec without a valid lock, with `heideng/<slug>` checked out in a worktree of the project repo, or already merged on this lock. `heideng accept` rejects a slug with `.heideng/specs/<slug>/` on `main`: a change to a merged spec is a new spec that supersedes its ACs. `heideng accept` on a spec whose run is in progress is rejected; on a spec whose run is stopped, the new lock ends that run as `stopped`, reason `spec-changed`, and the next `heideng run` starts a new run on top of the branch.
 
@@ -526,7 +526,7 @@ The person closes an escalation together with an agent, which reads the state fi
    - reads the evidence and explains the cause to the person;
    - agrees a closure with the person;
    - writes `resolution.md`, and edits the files in `spec/` when the closure changes the spec or the contract;
-   - tells the person to type `/exit` when satisfied.
+   - lists the absolute paths of `resolution.md` and of the changed files in `spec/` for the person to review, and tells the person to type `/exit` when satisfied.
 3. Closures, combinable:
    - note, the `## Note` section of `resolution.md`: a decision added to `decisions.yaml`; for a `ticket` escalation the ticket is requeued;
    - budget, the `budget` key of the frontmatter: `add-usd`, `add-time`, `add-passes`, with the meaning of the `resume` flags;
@@ -538,7 +538,7 @@ The person closes an escalation together with an agent, which reads the state fi
    - the frontmatter is valid and every `holdout` check exists;
    - the note contains no line of the Assertions section or of `run` of the spec's holdout checks (shebangs and lines under `limits.leak_min_chars` characters aside), because workers read `decisions.yaml`.
 5. Errors: the engine prints them and the next `heideng resolve <id>` resumes the same session with the errors as the first message.
-6. Ok: the engine asks `y/a/n` (`a`: apply without resuming). With another escalation of the run open it asks `y/n`, and `y` applies without resuming. On `n` nothing changes and the staging stays. On `y` or `a` it:
+6. Ok: the engine prints the absolute paths of `resolution.md` and of the changed files in `spec/`, then asks `y/a/n` (`a`: apply without resuming). With another escalation of the run open it asks `y/n`, and `y` applies without resuming. On `n` nothing changes and the staging stays. On `y` or `a` it:
    - commits the note added to `decisions.yaml` on `heideng/<slug>`;
    - records under `## Resolved` of the escalation the note, the budget allowances and the lock version, and closes it;
    - requeues its ticket and grants the budget allowances to the run;
