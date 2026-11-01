@@ -38,12 +38,12 @@ The spec has two parts. [Part I](#part-i---core) defines the factory: principles
 |---|---|
 | Spec | Free-form document describing the change. After `accept` it is in `.heideng/specs/<slug>/spec.md` |
 | Slug | Id of a spec: the spec file name, lowercase, `[a-z0-9-]`. `inputs`, `retired`, `runs`, `home` and `doctor` are reserved |
-| AC | Acceptance criterion with a stable id (`AC-1`) in `acceptance.md`, marked `auto` or `manual`. Outside its spec an AC is cited as `<slug>/AC-1` |
+| AC | Acceptance criterion with a stable id (`AC-1`) in `acceptance.yaml`, marked `auto` or `manual`. Outside its spec an AC is cited as `<slug>/AC-1` |
 | Active spec | A spec merged into `main` whose checks are not retired. Its ACs are the active ACs; its checks run in regression |
-| Contract | `.heideng/contract.md`, one per project, cumulative: host prerequisites, product scripts, services, how checks drive and observe the product |
-| Requires | A contract line with a command that exits 0 when a host prerequisite holds |
-| Decisions | `.heideng/specs/<slug>/decisions.md` on the branch: product choices fixed at accept, then the agents' decisions and resolve notes of the run |
-| Check | Holdout unit: `check.md` (ACs, Intent, Assertions, Contract) plus an executable `run`, optional `overlay/` |
+| Contract | `.heideng/contract.yaml`, one per project, cumulative: host prerequisites, product scripts, services, how checks drive and observe the product |
+| Requires | An entry of the contract's `requires` list: a command that exits 0 when a host prerequisite holds |
+| Decisions | `.heideng/specs/<slug>/decisions.yaml` on the branch: product choices fixed at accept, then the agents' decisions and resolve notes of the run |
+| Check | Holdout unit: `check.md` (frontmatter `acs` and `contract`, sections Intent and Assertions) plus an executable `run`, optional `overlay/` |
 | Check run | The execution of a check's `run`; `check-run` in `sandbox.relaxed` |
 | Overlay | Files a check adds to a disposable checkout before the build (test files compiled against the product) |
 | Green, red | Exit 0 of a script, any other exit or a timeout |
@@ -217,13 +217,13 @@ Execution rules, the same in every step:
 
 #### Contract
 
-`.heideng/contract.md` is in the repo and is cumulative. Each spec changes only the parts it touches on its branch; the delta enters `main` with the run's merge, and `spec.lock` records its hash.
+`.heideng/contract.yaml` is in the repo and is cumulative. Each spec changes only the parts it touches on its branch; the delta enters `main` with the run's merge, and `spec.lock` records its hash. It has five keys, in the format of [File formats](#file-formats):
 
-- **Requires.** One line per host prerequisite, as a command that exits 0 when the prerequisite holds: `` - Requires: `xcodebuild -version` ``, `` - Requires: `node -e "process.exit(+process.versions.node.split('.')[0] < 22)"` ``. The engine runs them on the host and inside the sandboxes.
-- **Run.** The profile, which of `start`, `ready`, `services`, `services-ready` and `test-host` exist, the number of ports, what the product reads from the environment, and the cache directories inside the checkout that a reset keeps (`node_modules`, `.build`).
-- **Services.** Each runtime dependency `services` starts, with the port and data directory it uses.
-- **Drive.** What checks use to reach the product: routes, commands and exit codes, public modules and types, UI labels and accessibility identifiers, the overlay directories checks may write (`Tests/HoldoutTests/`). Overlay directories exist in the repo, empty, already wired into the build (a test target, a test glob), and `test` does not run them. If a behavior depends on time, Drive declares the time control.
-- **Observe.** Evidence a check reads: output, files under `HEIDENG_DATA`, DB rows.
+- **Requires** (`requires`). One command per host prerequisite that exits 0 when the prerequisite holds: `xcodebuild -version`, `node -e "process.exit(+process.versions.node.split('.')[0] < 22)"`. The engine runs them on the host and inside the sandboxes.
+- **Run** (`run`). The profile, which of `start`, `ready`, `services`, `services-ready` and `test-host` exist, the number of ports, what the product reads from the environment, and the cache directories inside the checkout that a reset keeps (`node_modules`, `.build`).
+- **Services** (`services`). Each runtime dependency `services` starts, with the port and data directory it uses.
+- **Drive** (`drive`). What checks use to reach the product: routes, commands and exit codes, public modules and types, UI labels and accessibility identifiers, the overlay directories checks may write (`Tests/HoldoutTests/`). Overlay directories exist in the repo, empty, already wired into the build with their subdirectories (a test target, a recursive test glob), and `test` does not run them. If a behavior depends on time, Drive declares the time control.
+- **Observe** (`observe`). Evidence a check reads: output, files under `HEIDENG_DATA`, DB rows.
 
 #### Product profiles
 
@@ -233,23 +233,23 @@ A profile is the preset accept proposes for the contract and `heideng.yaml`: how
 
 One of the two interactive sessions with the person; the other is [resolve](#resolve-heideng-resolve-id).
 
-1. The engine prepares `state/accept/<slug>/` with a copy of the spec, `.heideng/contract.md`, the `acceptance.md` of active specs, the profiles and the accept prompt, and starts an interactive `claude` session there. The person and the agent talk directly.
+1. The engine prepares `state/accept/<slug>/` with a copy of the spec, `.heideng/contract.yaml`, the `acceptance.yaml` of active specs, the profiles and the accept prompt, and starts an interactive `claude` session there. The person and the agent talk directly.
 2. The agent:
-   - picks the profile with the person and checks the spec against the contract sections, proposing what is missing (Requires, scripts, Services, Drive, Observe);
+   - picks the profile with the person and checks the spec against the contract keys, proposing what is missing (Requires, scripts, Services, Drive, Observe);
    - lists the product choices the spec leaves open (language and version, dependencies, normalization of input, output formats, ordering tie-breaks, error precedence) and asks the person for each;
    - extracts the ACs with stable ids, each `auto` (a check can settle it) or `manual` (the person judges it after the run);
    - lists the ACs of active specs this spec modifies or removes, as `<slug>/AC-n`;
-   - writes `spec.md`, `acceptance.md`, `contract.md` and `decisions.md` in the directory;
+   - writes `spec.md`, `acceptance.yaml`, `contract.yaml` and `decisions.yaml` in the directory, in the [file formats](#file-formats);
    - tells the person to type `/exit` when satisfied.
 3. When the session ends the engine runs the accept check:
    - ACs: unique ids, `auto` or `manual` on each, every superseded `<slug>/AC-n` exists among the active ACs;
-   - contract: the five sections, at least one Requires line, Drive lists the overlay directories;
-   - every Requires command exits 0 on the host.
+   - contract: the five keys, at least one `requires` entry, `drive.overlay` lists the overlay directories;
+   - every `requires` command exits 0 on the host.
 4. With the accept check passed the engine runs [doctor](#doctor).
 5. Errors of either: the engine prints them and `heideng accept <spec>` resumes the same session with the errors as the first message.
-6. Ok: the engine asks `y/n`. On `n` nothing changes and the staging stays for the next `accept`. On `y` it creates `heideng/<slug>` from `main` when it does not exist, and commits on it `spec.md`, `acceptance.md`, `decisions.md` and `spec.lock` under `.heideng/specs/<slug>/`, and the contract at `.heideng/contract.md`. `spec.lock` holds the version, the hashes of the committed files and the superseded ACs.
+6. Ok: the engine asks `y/n`. On `n` nothing changes and the staging stays for the next `accept`. On `y` it creates `heideng/<slug>` from `main` when it does not exist, and commits on it `spec.md`, `acceptance.yaml`, `decisions.yaml` and `spec.lock` under `.heideng/specs/<slug>/`, and the contract at `.heideng/contract.yaml`. `spec.lock` holds the version, the hashes of the committed files and the superseded ACs.
 
-A lock is valid when its hashes match the committed files. `heideng run` rejects a spec without a valid lock, with `heideng/<slug>` checked out in a worktree of the project repo, or already merged on this lock. `heideng accept` on a spec whose run is in progress is rejected; on a spec whose run is stopped, the new lock ends that run as `stopped`, reason `spec-changed`, and the next `heideng run` starts a new run on top of the branch.
+A lock is valid when its hashes match the committed files. `heideng run` rejects a spec without a valid lock, with `heideng/<slug>` checked out in a worktree of the project repo, or already merged on this lock. `heideng accept` rejects a slug with `.heideng/specs/<slug>/` on `main`: a change to a merged spec is a new spec that supersedes its ACs. `heideng accept` on a spec whose run is in progress is rejected; on a spec whose run is stopped, the new lock ends that run as `stopped`, reason `spec-changed`, and the next `heideng run` starts a new run on top of the branch.
 
 ### Holdout
 
@@ -259,23 +259,23 @@ The layout of the `holdout` zone for checks:
 holdout/<slug>/
   manifest.json        spec.lock hash, file hashes, oracle verdict
   <check-id>/
-    check.md           ACs, Intent, Assertions, Contract
+    check.md           frontmatter acs, contract; Intent, Assertions
     run                executable, exit 0 = pass
     overlay/           optional, mirrors paths of the repo
-holdout/inputs/<slug>/ spec.md, acceptance.md, contract.md, decisions.md, holdout-notes.md for holdout-gen
+holdout/inputs/<slug>/ spec.md, acceptance.yaml, contract.yaml, decisions.yaml, holdout-notes.yaml for holdout-gen
 holdout/retired/<slug>/<check-id>/   with the reason
 ```
 
-- `check.md` has four sections. ACs lists the ids it covers. Intent describes the behavior in user terms and is the only text of the check a worker may receive. Assertions describes what `run` verifies, for the oracle. Contract lists the Drive and Observe entries the check uses.
+- `check.md` has a YAML frontmatter and two sections. `acs` lists the ids it covers; `contract` lists the Drive and Observe entries the check uses. Intent describes the behavior in user terms and is the only text of the check a worker may receive. Assertions describes what `run` verifies, for the oracle.
 - An `auto` AC has at least one check. A check covers one or more ACs of its spec.
-- Overlay paths fall under the overlay directories of the contract's Drive. An overlay file that would overwrite a file of the checkout makes the check red with "overlay collision", an escalation of kind `holdout`.
+- Overlay paths fall under `<overlay directory>/<slug>/<check-id>/`, for an overlay directory of the contract's Drive, so overlays of different checks never share a path. An overlay file that would overwrite a file of the checkout makes the check red with "overlay collision", an escalation of kind `holdout`.
 
 #### Generation
 
-- At the start of the node the engine copies the four accepted files from the branch into `holdout/inputs/<slug>/`, next to the `holdout-notes.md` of resolve when present. holdout-gen regenerates the checks the notes name.
+- At the start of the node the engine copies the four accepted files from the branch into `holdout/inputs/<slug>/`, next to the `holdout-notes.yaml` of resolve when present. holdout-gen regenerates the checks the notes name.
 - holdout-gen and the oracle run with cwd `holdout/<slug>/`. holdout-gen's declared reads are `holdout/inputs/<slug>/` and the checks of the other active specs. Neither has access to the repo.
 - holdout-gen writes checks only for the ACs of its spec. A behavior that a superseded AC described is covered by the ACs of the new spec; the checks of the superseded AC stay with their spec until merge main retires them.
-- Holdout lint (tool): every `auto` AC covered, every cited AC exists, `run` executable with a shebang, `check.md` sections present, every Contract entry exists in the contract, overlay under the declared directories.
+- Holdout lint (tool): every `auto` AC covered, every cited AC exists, `run` executable with a shebang, `check.md` frontmatter and sections present, every entry of its `contract` exists in the contract, overlay under `<overlay directory>/<slug>/<check-id>/`.
 - Holdout oracle: coverage and non-trivial assertions, on `check.md` and `run`. Output `{ ok, issues[], fixed }`, `fixed` being the number of issues of the previous judgment now resolved. After `ok: false` the next judgment receives its issues and only the files changed since.
 - Reuse: with the manifest validated for the current `spec.lock` hash and file hashes unchanged, the engine skips generation and oracle.
 - Inside a run checks are immutable; verify rechecks the hashes before running them.
@@ -317,12 +317,12 @@ The body lives in `state/runs/<run>/tickets/<id>.md`, the other fields in `run.j
 #### Implement
 
 - An LLM session with cwd the work clone and the [worker sandbox](#sandbox-model). Every visit is a new session.
-- Prompt: ticket, spec, `acceptance.md`, `contract.md`, `decisions.md`, the execution rules of the scripts. With `visit > 1`, the compressed output of the previous red test.
+- Prompt: ticket, spec, `acceptance.yaml`, `contract.yaml`, `decisions.yaml`, the execution rules of the scripts. With `visit > 1`, the compressed output of the previous red test.
 - [Skills](#skills): `/tdd` on every visit, `diagnosing-bugs` with `visit > 1`, `verification-before-completion` before returning `done`, `ponytail` on the code of every green step. Their precedence is in [Implement precedence](#implement-precedence).
-- Output: `{ status: done|blocked|dispute, summary, decisions[], skipped[] }`. The agent decides alone. Where ticket and documents do not decide, it takes the most conservative choice: no new dependency, no change to a public interface, existing behavior kept, the smallest diff. It records the choice in `decisions[]`. The engine appends them to `decisions.md` in the ticket's commit, emits a `decision` event for each, and lists them in the report.
+- Output: `{ status: done|blocked|dispute, summary, decisions[], skipped[] }`. The agent decides alone. Where ticket and documents do not decide, it takes the most conservative choice: no new dependency, no change to a public interface, existing behavior kept, the smallest diff. It records the choice in `decisions[]`. The engine adds them to `decisions.yaml` in the ticket's commit, emits a `decision` event for each, and lists them in the report.
 - `blocked` marks the ticket `escalated` and opens an escalation of kind `ticket`.
-- `dispute`, allowed only on an `F` ticket from verify or regression, states in `summary` why the check's Intent contradicts the spec, `acceptance.md` or `decisions.md`. It marks the ticket `escalated` and opens an escalation of kind `holdout`.
-- The engine adds a mandatory review note when a diff touches `.heideng/*` outside the bootstrap and outside the `decisions.md` append.
+- `dispute`, allowed only on an `F` ticket from verify or regression, states in `summary` why the check's Intent contradicts the spec, `acceptance.yaml` or `decisions.yaml`. It marks the ticket `escalated` and opens an escalation of kind `holdout`.
+- The engine adds a mandatory review note when a diff touches `.heideng/*` outside the bootstrap and outside the entries the engine adds to `decisions.yaml`.
 
 #### Test (tool)
 
@@ -358,7 +358,7 @@ The engine deletes the checkout and its scope directory after the step. Verify r
 #### Review
 
 - One LLM session per round, model different from implement, on a clone of `heideng/<slug>`. The engine discards the changes it makes.
-- `/code-review` on `base_round..heideng/<slug>`, with spec and `acceptance.md`; `ponytail-review` feeds the `lean` axis. Output `{ notes: [{ axis: spec|standards|lean, severity: blocking|minor, msg, files[] }] }`.
+- `/code-review` on `base_round..heideng/<slug>`, with spec and `acceptance.yaml`; `ponytail-review` feeds the `lean` axis. Output `{ notes: [{ axis: spec|standards|lean, severity: blocking|minor, msg, files[] }] }`.
 - Round 1: every `blocking` note becomes `R-<n>`. Later rounds: only `blocking` notes on the `spec` axis. Other notes go to the report.
 
 #### Route
@@ -374,7 +374,7 @@ In order:
 
 Runs in the work clone each time route goes to regression.
 
-- An LLM session with the [worker sandbox](#sandbox-model), model from `nodes.docs`. Prompt: spec, `acceptance.md`, `contract.md`, `decisions.md`, the diff `<merge base with main>..heideng/<slug>` and the paths of `docs.paths`.
+- An LLM session with the [worker sandbox](#sandbox-model), model from `nodes.docs`. Prompt: spec, `acceptance.yaml`, `contract.yaml`, `decisions.yaml`, the diff `<merge base with main>..heideng/<slug>` and the paths of `docs.paths`.
 - The agent updates the documentation under `docs.paths` for the change: what the product does now, how to run and use it, the decisions that affect a user. It creates the files that do not exist. Output `{ summary, files[] }`.
 - The engine keeps only the diff under `docs.paths` and resets the rest with a note in the report. With an empty diff the node ends with the note "no documentation change".
 - Smoke on the work clone. Green: commit `docs: <slug>` and push. Red, or an LLM call that exhausts its per-call limit: reset to the head before docs, and the report carries the reason under "Docs".
@@ -382,9 +382,9 @@ Runs in the work clone each time route goes to regression.
 
 #### Regression
 
-- Checks of active specs on the branch, exec `regression`, like verify. Checks that cover a superseded AC do not run.
+- Checks of active specs on the branch, exec `regression`, like verify. Checks that cover a superseded AC do not run. The checkout holds the overlays of every check that runs.
 - A red check runs once on an export of `main`, exec `regression/main`. Red there too: the check is skipped and the report lists it.
-- A red check whose Contract entries the spec's contract delta changed opens an escalation of kind `holdout`.
+- A red check whose `contract` entries the spec's contract delta changed opens an escalation of kind `holdout`. It closes with a spec closure: the spec supersedes the check's ACs, or the contract restores the entry.
 - Other red checks: fix tickets and a new round.
 
 #### Merge main
@@ -396,7 +396,7 @@ Runs in the work clone each time route goes to regression.
 5. `main` moved since step 2: back to step 1, at most `limits.merge_retries` times.
 6. The engine moves the checks that cover the superseded ACs to `holdout/retired/<slug>/<check-id>/` with the reason "superseded by <slug>". The active ACs those checks also covered are listed in the report as uncovered.
 
-A red step, a dirty working tree, a failed push or fast-forward, or `merge_retries` exhausted is an escalation of kind `merge`. On resume merge main is done when the head of `heideng/<slug>` is an ancestor of `main`.
+A red step, a dirty working tree, a failed push or fast-forward, or `merge_retries` exhausted is an escalation of kind `merge`. On resume merge main is done when the head of `heideng/<slug>` is an ancestor of `main`; the engine then runs step 6 again, which moves only the checks still in place.
 
 ### Isolation
 
@@ -456,7 +456,7 @@ Each sandboxed scope writes in one zone and is denied the others. The `state` zo
   - implement: reset of the work clone, ticket `escalated`; the round continues with the next runnable ticket;
   - docs: reset to the head before docs; the run continues;
   - plan, review, holdout-gen, oracle: output discarded; the run stops with reason `escalation`.
-- A `leak` escalation closes with a `## Note` recording the path and whether the read was harmless. When the path is a toolchain need, the person adds it to `sandbox.read` before resuming; the node runs again on resume.
+- A `leak` escalation closes with a note recording the path and whether the read was harmless. When the path is a toolchain need, the person adds it to `sandbox.read` before resuming; the node runs again on resume.
 - The sandbox denials are the control; the audit is a tripwire.
 
 #### Doctor
@@ -489,12 +489,12 @@ A red doctor rejects the command (exit 5) before any node, with the failing comm
 - Every non-interactive LLM call has the per-call limits of `nodes.defaults`, overridable per node: `max_usd`, `max_turns`, `timeout`. A call that exhausts one counts as a red visit for implement, a pass without progress for the `holdout` and `plan` loops, no notes for review, and a red docs node.
 - The engine writes each escalation from a template in `state/runs/<run>/escalations/<id>.md`, with what, why, evidence, the exhausted limit if any, and how to close.
 - Closing: `heideng resolve <id>`, see [Resolve](#resolve-heideng-resolve-id).
-- `heideng resume` gives each exhausted limit a new allowance equal to its configured value; `--add-usd`, `--add-time`, `--add-passes` set an explicit allowance. It closes the open escalations caused by those limits and records the command under `## Resolved`.
+- `heideng resume` gives each exhausted limit a new allowance equal to its configured value; `--add-usd`, `--add-time`, `--add-passes` set an explicit allowance. It closes the open escalations caused by those limits and records the command under `## Resolved`. With other escalations open it rejects the run and prints their `heideng resolve` commands.
 
 | Escalation kind | Opened by |
 |---|---|
 | `ticket` | implement returns `blocked`, failed ticket (patience or `max_passes` on visits) |
-| `holdout` | overlay collision, `holdout` loop exhausted, regression red on a changed Contract entry, `dispute` on an `F` ticket |
+| `holdout` | overlay collision, `holdout` loop exhausted, regression red on a changed `contract` entry, `dispute` on an `F` ticket |
 | `plan` | `plan` loop exhausted |
 | `rounds` | `rounds` loop exhausted |
 | `merge` | conflict, red step, dirty working tree, failed push or fast-forward, `merge_retries` exhausted |
@@ -511,7 +511,8 @@ A red doctor rejects the command (exit 5) before any node, with the failing comm
 | Ctrl-C, SIGTERM, SIGHUP | `stopped`, reason `interrupted` | 3 | `heideng resume` |
 | spec or checks changed by `accept` or `resolve` | `stopped`, reason `spec-changed` or `holdout-changed` | - | `heideng run <spec>` |
 | engine error, LLM retries exhausted | `failed` | 4 | - |
-| rejected: invalid lock, active run, red doctor | no run | 5 | fix and rerun |
+| engine killed, machine down | none | - | `heideng resume` |
+| rejected: invalid lock, active run, red doctor, resume with open escalations | no run | 5 | fix and rerun |
 | `heideng abort` | `aborted` | 6 | - |
 
 Other commands exit 0 on success and 4 on error.
@@ -520,29 +521,29 @@ Other commands exit 0 on success and 4 on error.
 
 The person closes an escalation together with an agent, which reads the state files for them.
 
-1. The engine prepares `state/resolve/<id>/` with `escalation.md`, `spec/` (the accepted `spec.md`, `acceptance.md`, `contract.md` and `decisions.md` from the branch, plus `spec/active/<slug>/acceptance.md` for each active spec) and the resolve prompt, and starts an interactive `claude` session there. The session reads the run directory and the holdout checks of the spec where they are.
+1. The engine prepares `state/resolve/<id>/` with `escalation.md`, `spec/` (the accepted `spec.md`, `acceptance.yaml`, `contract.yaml` and `decisions.yaml` from the branch, plus `spec/active/<slug>/acceptance.yaml` for each active spec) and the resolve prompt, and starts an interactive `claude` session there. The session reads the run directory and the holdout checks of the spec where they are.
 2. The agent:
    - reads the evidence and explains the cause to the person;
    - agrees a closure with the person;
    - writes `resolution.md`, and edits the files in `spec/` when the closure changes the spec or the contract;
    - tells the person to type `/exit` when satisfied.
 3. Closures, combinable:
-   - `## Note` in `resolution.md`: a decision appended to `decisions.md`; for a `ticket` escalation the ticket is requeued;
-   - `## Budget` in `resolution.md`: lines `- add-usd: <n>`, `- add-time: <duration>`, `- add-passes: <n>`, with the meaning of the `resume` flags;
+   - note, the `## Note` section of `resolution.md`: a decision added to `decisions.yaml`; for a `ticket` escalation the ticket is requeued;
+   - budget, the `budget` key of the frontmatter: `add-usd`, `add-time`, `add-passes`, with the meaning of the `resume` flags;
    - spec: the files in `spec/` differ from the accepted ones;
-   - `## Holdout` in `resolution.md`: the checks to regenerate, each with what is wrong in user terms. It applies to a `holdout` escalation.
+   - holdout, the `holdout` key of the frontmatter: the checks to regenerate, each with what is wrong in user terms. It applies to a `holdout` escalation on a check of the run's spec.
 4. When the session ends the engine runs the resolve check:
    - at least one closure;
    - changed spec files pass the accept check;
-   - every budget line is valid;
-   - the note contains no line of the Assertions section or of `run` of the spec's holdout checks (shebangs and lines under `limits.leak_min_chars` characters aside), because workers read `decisions.md`.
+   - the frontmatter is valid and every `holdout` check exists;
+   - the note contains no line of the Assertions section or of `run` of the spec's holdout checks (shebangs and lines under `limits.leak_min_chars` characters aside), because workers read `decisions.yaml`.
 5. Errors: the engine prints them and the next `heideng resolve <id>` resumes the same session with the errors as the first message.
 6. Ok: the engine asks `y/a/n` (`a`: apply without resuming). With another escalation of the run open it asks `y/n`, and `y` applies without resuming. On `n` nothing changes and the staging stays. On `y` or `a` it:
-   - commits the note appended to `decisions.md` on `heideng/<slug>`;
-   - records under `## Resolved` of the escalation the note, the budget lines and the lock version, and closes it;
+   - commits the note added to `decisions.yaml` on `heideng/<slug>`;
+   - records under `## Resolved` of the escalation the note, the budget allowances and the lock version, and closes it;
    - requeues its ticket and grants the budget allowances to the run;
    - with changed spec files, commits them on `heideng/<slug>` with a new lock version and ends the run as `stopped`, reason `spec-changed`;
-   - with a `## Holdout` closure, writes it to `holdout/inputs/<slug>/holdout-notes.md`, invalidates the manifest and ends the run as `stopped`, reason `holdout-changed`.
+   - with a holdout closure, adds its entries to `holdout/inputs/<slug>/holdout-notes.yaml`, invalidates the manifest and ends the run as `stopped`, reason `holdout-changed`.
 
    With another escalation open it prints the ones still open. With the spec or the holdout changed it prints `heideng run <spec>`. Otherwise, on `a` it prints `heideng resume <run>`; on `y` it resumes the run in a new `heideng resume <run>` process, which loads the current heideng code.
 
@@ -586,6 +587,7 @@ holdout/
 - `exec` is the deterministic key of a node execution: `r<n>/<ticket>/v<n>`, `r<n>/host`, `r<n>/verify`, `r<n>/review`, `holdout/v<n>`, `plan/v<n>`, `docs/v<n>`, `regression`, `regression/main`, `merge-main`, `report`.
 - Ctrl-C (SIGINT), SIGTERM and SIGHUP on the engine kill the node in progress and end the run as `stopped` with reason `interrupted`; `heideng resume` continues it. `heideng abort` writes `aborted` into `run.json`, then sends SIGTERM; the run ends as `aborted`.
 - `heideng resume` restarts the node in progress. It resets an `implementing` ticket to its base sha, checks a `done` ticket with `git merge-base --is-ancestor`, restarts verify, review, docs and regression from scratch, and treats merge main as described in [Merge main](#merge-main).
+- A command that finds `run.lock` with the pid of no running heideng process treats the engine as crashed: the run has no `run.end`, `heideng run` rejects it as active, `heideng resume` takes the lock and restarts the node in progress. `heideng resume` with the pid of a running engine is rejected.
 - `run.lock` is released when the run ends `merged`, `failed`, `aborted` or `stopped` with reason `spec-changed` or `holdout-changed`, and by `heideng close`.
 - Before writing any file the engine replaces secret values with `***`.
 
@@ -633,11 +635,178 @@ Branch heideng/<slug> - round 3 - $27.80 / 50 - 5h12 / 6h - $2.10 per verified A
 ## Costs
 ```
 
+### File formats
+
+The engine parses these files; the accept, resolve and holdout lint checks reject a file that does not follow its format. Free text sits only where the format shows `<text>`.
+
+YAML rules, for every YAML file and frontmatter heideng reads or writes:
+- block style only: every mapping and every list is expanded one entry per line; the flow syntax with braces and brackets is never used;
+- free text is a block scalar (`|`); every other string that contains `:`, `#` or a leading special character is double-quoted;
+- `true` and `false` are the only booleans; values like `yes`, `no`, `on`, `off` are strings and are quoted;
+- the engine validates every file against its schema; an error names the file, the key and the line, and the session that wrote the file receives it.
+
+`.heideng/specs/<slug>/acceptance.yaml`:
+
+```yaml
+acs:
+  - id: AC-1
+    kind: auto
+    text: |
+      <text>
+  - id: AC-2
+    kind: manual
+    text: |
+      <text>
+supersedes:
+  - ac: <other-slug>/AC-3
+    reason: |
+      <text>
+```
+
+- Ids are `AC-<n>`, unique in the file and never reused. `kind` is `auto` or `manual`. `supersedes` is present when the spec supersedes ACs.
+
+`.heideng/contract.yaml`:
+
+```yaml
+requires:
+  - "<command>"
+run:
+  profile: <profile>
+  scripts:
+    - start
+    - ready
+  ports: 1
+  env:
+    - <NAME>
+  caches:
+    - <path>
+services:
+  - name: <name>
+    port: <i>
+    data: <dir>
+drive:
+  overlay:
+    - <directory>
+  time: |
+    <text>
+  entries:
+    - name: <name>
+      text: |
+        <text>
+observe:
+  entries:
+    - name: <name>
+      text: |
+        <text>
+```
+
+- `run.scripts` lists the optional scripts that exist, among `start`, `ready`, `services`, `services-ready`, `test-host`. `ports` defaults to 1; `caches` are paths of the checkout.
+- A service gives its index in `HEIDENG_PORTS` (1-based) and its directory under `HEIDENG_DATA`.
+- `drive.time` is present when a behavior depends on time.
+- Drive and Observe entries have a `name` unique in the contract, `[a-z0-9-]`. A check's `contract` cites entries by name.
+
+`holdout/<slug>/<check-id>/check.md`, `<check-id>` being `[a-z0-9-]`:
+
+```markdown
+---
+acs:
+  - AC-1
+contract:
+  - <name>
+---
+
+## Intent
+<text>
+
+## Assertions
+- <text>
+```
+
+`.heideng/specs/<slug>/spec.lock`:
+
+```json
+{ "version": 3, "files": { "spec.md": "sha256:<hex>", "acceptance.yaml": "sha256:<hex>", "decisions.yaml": "sha256:<hex>", "contract.yaml": "sha256:<hex>" }, "supersedes": ["<other-slug>/AC-3"] }
+```
+
+- `version` starts at 1 and increments with every new lock of the slug.
+
+`.heideng/specs/<slug>/decisions.yaml`:
+
+```yaml
+decisions:
+  - source: accept
+    text: |
+      <text>
+  - source: ticket
+    run: <run>
+    id: T-03
+    text: |
+      <text>
+  - source: escalation
+    run: <run>
+    id: E-2
+    text: |
+      <text>
+```
+
+- accept writes the `accept` entries. The engine adds one entry per decision of a ticket and per resolve note, at the end of the list.
+
+`.heideng/env` lists one app secret name per line, `#` starting a comment. `state/env` holds `NAME=value` lines.
+
+`state/runs/<run>/escalations/<id>.md`, written by the engine:
+
+```markdown
+# E-1 - <kind>
+- exec: <exec>
+- ticket: <id>
+- limit: <limit>
+
+## What
+## Why
+## Evidence
+- <path>
+## How to close
+## Resolved
+```
+
+- `ticket` and `limit` are present when they apply. The engine writes `## Resolved` when the escalation closes.
+
+`state/resolve/<id>/resolution.md` holds the closures, each optional:
+
+```markdown
+---
+budget:
+  add-usd: <n>
+  add-time: <duration>
+  add-passes: <n>
+holdout:
+  - check: <check-id>
+    reason: |
+      <text>
+---
+
+## Note
+<text>
+```
+
+`holdout/inputs/<slug>/holdout-notes.yaml` holds the `holdout` entries of the resolutions that wrote it:
+
+```yaml
+holdout:
+  - check: <check-id>
+    reason: |
+      <text>
+```
+
+`state/runs/<run>/tickets/<id>.md` starts with `# <id>: <title>`, followed by the body.
+
+`heideng.yaml` follows the keys of [Config](#config) and the YAML rules above; an unknown key or a value of the wrong type rejects the command before any node.
+
 ### CLI
 
 | Command | What it does |
 |---|---|
-| `heideng init` | writes `heideng.yaml`, empty `.heideng/contract.md`, `.heideng/env`; runs doctor |
+| `heideng init` | writes `heideng.yaml`, empty `.heideng/contract.yaml`, `.heideng/env`; runs doctor |
 | `heideng doctor` | Requires, isolation probe, skills of each node |
 | `heideng accept <spec>` | interactive session, accept check, doctor, branch and lock |
 | `heideng run <spec>` | runs the pipeline |
@@ -655,14 +824,23 @@ During `run` and `resume` stderr shows progress: an in-place [terminal view](#te
 
 ```yaml
 sandbox:
-  allow: [registry.npmjs.org]                        # network for agents and product scripts
-  read: [~/.nvm]                                     # toolchain paths under the real home, read-only for every scope
-  write: [~/.npm]                                    # toolchain caches, resolved under the scope HOME; $NAME opens the host directory NAME to every scope
-  extra: {}                                          # toolchain sandbox options merged into agent and srt settings, reported
-  relaxed: []                                        # build, test, services, start, check-run: run under the relaxed profile, reported
+  allow:                # network for agents and product scripts
+    - registry.npmjs.org
+  read:                 # toolchain paths under the real home, read-only for every scope
+    - ~/.nvm
+  write:                # toolchain caches, resolved under the scope HOME; $NAME opens the host directory NAME to every scope
+    - ~/.npm
+  extra:                # toolchain sandbox options merged into agent and srt settings, reported
+  relaxed:              # build, test, services, start, check-run: run under the relaxed profile, reported
 docs:
-  paths: [README.md, docs/]                          # the only paths the docs node may change
-budgets: { usd: 50, wall_clock: 6h, patience: 2, max_passes: 10 }
+  paths:                # the only paths the docs node may change
+    - README.md
+    - docs/
+budgets:
+  usd: 50
+  wall_clock: 6h
+  patience: 2
+  max_passes: 10
 limits:
   script_timeout: 20m
   ready_timeout: 60s
@@ -672,15 +850,27 @@ limits:
   leak_min_chars: 12
   merge_retries: 3
 nodes:
-  defaults:    { max_usd: 5, max_turns: 200, timeout: 60m }
-  accept:      { model: opus }
-  resolve:     { model: opus }
-  holdout-gen: { model: opus }
-  oracle:      { model: sonnet }
-  plan:        { model: opus }
-  implement:   { model: sonnet, effort: medium }
-  review:      { model: opus }
-  docs:        { model: sonnet }
+  defaults:
+    max_usd: 5
+    max_turns: 200
+    timeout: 60m
+  accept:
+    model: opus
+  resolve:
+    model: opus
+  holdout-gen:
+    model: opus
+  oracle:
+    model: sonnet
+  plan:
+    model: opus
+  implement:
+    model: sonnet
+    effort: medium
+  review:
+    model: opus
+  docs:
+    model: sonnet
 ```
 
 `sandbox.extra` merges into the sandbox settings: objects merge, lists concatenate, any other value is set.
@@ -776,10 +966,42 @@ The engine runs every script and check run through `srt --settings <file>`, with
 
 `/tdd` drives the loop and `ponytail` shapes the code of every green step, with the precedence stated in heideng's implement prompt:
 - test order and count follow `tdd`: red before green, one test per slice, only at the seams; `ponytail` adds no test of its own;
-- the seams come from the ticket and `acceptance.md`, and the agent records them in `decisions[]`;
+- the seams come from the ticket and `acceptance.yaml`, and the agent records them in `decisions[]`;
 - `ponytail` decides the code of each green step: the first option of its ladder, as defined in the `ponytail` skill, that makes the test pass;
 - no refactor inside the loop; cuts happen in the green step or in review through `ponytail-review`;
 - what `ponytail` skipped goes in `skipped[]`.
+
+### Prompts
+
+heideng ships one prompt template per node in `prompts/<node>.md`. The engine fills its placeholders (paths, ticket, issues, limits) and saves the result as `prompt.md` of the exec. Every non-interactive prompt ends with the node's output schema, which `--json-schema` enforces.
+
+| Node | Role and rules in the prompt | Output |
+|---|---|---|
+| accept | steps of [Accept](#accept-heideng-accept-spec); the profiles; the [file formats](#file-formats) of the four files | the files in the staging folder |
+| resolve | steps of [Resolve](#resolve-heideng-resolve-id); the closures and the format of `resolution.md`; a note quotes no assertion or `run` line | `resolution.md`, edits in `spec/` |
+| holdout-gen | see below | `{ checks[], summary }` |
+| oracle | see below | `{ ok, issues[], fixed }` |
+| plan | `/to-tickets` and the rules of [Plan](#plan) | ticket files |
+| implement | rules of [Implement](#implement) and [Implement precedence](#implement-precedence) | `{ status, summary, decisions[], skipped[] }` |
+| review | `/code-review` on the round range, spec, `acceptance.yaml`; `blocking` means an AC unmet, a spec or contract violation, or a broken rule of the repo's documented standards; every other note is `minor` | `{ notes[] }` |
+| docs | rules of [Docs](#docs) | `{ summary, files[] }` |
+
+holdout-gen prompt:
+- write one directory per check, with `check.md` in its format and an executable `run`;
+- every Assertion maps to an AC of the check; `run` fails when the product breaks it;
+- `run` reaches the product only through the Drive entries and reads results only through the Observe entries it cites, with `HEIDENG_PORT`, `HEIDENG_PORTS`, `HEIDENG_DATA`, `HEIDENG_EVIDENCE` and `HEIDENG_APP_DIR`;
+- a check is deterministic: time through the Drive `time` entry, data created by the check itself, no network beyond `localhost`;
+- Intent describes the behavior in user terms without the expected values of the Assertions;
+- overlays follow the profile and stay under `<overlay directory>/<slug>/<check-id>/`;
+- the checks of the other active specs are read for consistency; the node writes only in its cwd;
+- on a new pass, the lint errors, the oracle issues and `holdout-notes.yaml`, and only the checks they name change.
+
+Oracle prompt:
+- `ok: false` when an `auto` AC has no Assertion that a wrong product would fail;
+- trivial assertions are issues: exit code only, non-empty output, a value the check itself wrote;
+- an Assertion with no AC, a behavior outside the spec, or a nondeterministic step is an issue;
+- an Intent that states an expected value of the Assertions is an issue;
+- each issue names the check and the AC.
 
 ### Output compression
 
