@@ -25,7 +25,7 @@ The spec has two parts. [Part I](#part-i---core) defines the factory: principles
 1. **The engine decides the path, the agent does the work.** Routing is deterministic code over outcomes, counters and budgets. Inside a node the agent works with its own tool loop and returns structured output.
 2. **Every loop has two stops.** Success comes from a check other than the worker. The budget stop closes the loop with a written reason: `patience` passes without progress, the `max_passes` cap, or the run's `usd` and `wall_clock`.
 3. **The worker never reads or changes its verifier.** Holdout checks live in the `holdout` zone, outside the repo, which every sandbox denies to the build scope: the coding agents and every script of the build scope. On a failed check the worker receives the check's Intent and the output of its `run`, never `check.md` or the code of `run`. The output can expose expected values; see [Non-goals and limits](#non-goals-and-limits).
-4. **Exit codes decide "done".** Build, test and holdout checks are scripts; their exit code is the verdict: exit 0 is green, any other exit is red. LLM judges assess only what a script cannot assess (holdout quality, code review), on a model different from the worker's.
+4. **Exit codes decide "done".** Build, test and holdout checks are scripts; their exit code is the verdict, [green or red](#glossary). LLM judges assess only what a script cannot assess (holdout quality, code review), on a model different from the worker's.
 5. **Everything heideng runs on the product is a script.** Build, test, start, ready, services and every holdout check are executables with a shebang, run on the host from a known directory with a known environment.
 6. **One thing at a time.** Tickets run in sequence on one working clone, each on top of the previous ticket's commit. The only code change since the last green commit is the ticket in progress.
 7. **The node boundary is the unit of durability.** After every node the engine saves state; a crash loses only the node in progress, which restarts from scratch on resume. A node whose effect is already visible in git (a pushed commit, a moved `main`) counts as done on resume.
@@ -48,7 +48,7 @@ The spec has two parts. [Part I](#part-i---core) defines the factory: principles
 | Overlay | Files a check adds to a disposable checkout before the build (test files compiled against the product) |
 | Green, red | Exit 0 of a script, any other exit or a timeout |
 | Flaky | Verdict of a check that is red, then green on the same code; it counts as fail |
-| Smoke | `build`, then `services` and `services-ready` when the product has them, `test`, `test-host` when the step includes it, then `start` and `ready` when the product has them. See [Scripts by step](#scripts-by-step) |
+| Smoke | The product scripts of a step, in the order of [Scripts by step](#scripts-by-step), each when the product has it |
 | Profile | Preset of contract and config for a kind of product, see [Product profiles](#product-profiles) |
 | Ticket | Unit of work, see [Tickets](#tickets) |
 | Plan | Ticket list validated by graph-check for one `spec.lock` version |
@@ -191,7 +191,7 @@ The product exposes itself to heideng through scripts in the repo.
 | `.heideng/ready` | with `start` | the started product accepts requests |
 
 Execution rules, the same in every step:
-- Run through the shebang, from the root of the checkout, under `srt` with the [product sandbox](#sandbox-model). `test-host` and the scripts listed in `sandbox.relaxed` run under the relaxed profile; the report lists them under "Isolation weakened".
+- Run through the shebang, from the root of the checkout, under `srt` with the [product sandbox](#sandbox-model). `test-host` and the scripts listed in `sandbox.relaxed` run under the [relaxed profile](#sandbox-model).
 - Environment:
   - `HEIDENG_PORTS`: space-separated free ports the engine picks, as many as the contract's Run section declares (default 1); `HEIDENG_PORT` is the first;
   - `HEIDENG_DATA`: an empty directory per execution;
@@ -365,7 +365,7 @@ The engine deletes the checkout and its scope directory after the step. Verify r
 
 In order:
 - Runnable tickets queued: new round.
-- All checks pass, no ticket queued, no ticket `failed` or `escalated`, no open escalation: docs, then regression. `manual` ACs never stop the run; the report lists them in "To do for you" and the person judges them on `main` after the merge.
+- All checks pass, no ticket queued, no ticket `failed` or `escalated`, no open escalation: docs, then regression. `manual` ACs go to "To do for you" in the report and the person judges them on `main` after the merge.
 - Otherwise: report, outcome per [Outcomes](#outcomes).
 
 ### Docs, regression and merge
@@ -378,11 +378,11 @@ Runs in the work clone each time route goes to regression.
 - The agent updates the documentation under `docs.paths` for the change: what the product does now, how to run and use it, the decisions that affect a user. It creates the files that do not exist. Output `{ summary, files[] }`.
 - The engine keeps only the diff under `docs.paths` and resets the rest with a note in the report. With an empty diff the node ends with the note "no documentation change".
 - Smoke on the work clone. Green: commit `docs: <slug>` and push. Red, or an LLM call that exhausts its per-call limit: reset to the head before docs, and the report carries the reason under "Docs".
-- Docs never changes the outcome of the run.
+- A red docs node leaves the outcome of the run unchanged.
 
 #### Regression
 
-- Checks of active specs on the branch, exec `regression`, like verify. Checks that cover a superseded AC do not run. The checkout holds the overlays of every check that runs.
+- Checks of active specs on the branch, exec `regression`, like verify, skipping the checks that cover a superseded AC. The checkout holds the overlays of every check that runs.
 - A red check runs once on an export of `main`, exec `regression/main`. Red there too: the check is skipped and the report lists it.
 - A red check whose `contract` entries the spec's contract delta changed opens an escalation of kind `holdout`. It closes with a spec closure: the spec supersedes the check's ACs, or the contract restores the entry.
 - Other red checks: fix tickets and a new round.
@@ -413,7 +413,7 @@ Every sandboxed execution belongs to a scope. The scope owns a `HOME` and the on
 - `sandbox.write`:
   - every `~`-relative entry resolves under the scope's `HOME`;
   - an entry `$NAME` names a [host directory](#glossary); it resolves to the host environment variable `NAME`, else to the value the OS reports for `NAME`;
-  - a host directory opens to every scope, so build and verify share it, and the report lists it under "Isolation weakened".
+  - a host directory opens to every scope, so build and verify share it.
 - `sandbox.read`: paths under the person's real home that toolchains need (`~/.nvm`, `~/.cargo`), read-only for every scope. `~` here is the real home.
 - The person's real home is neither readable nor writable, except the `sandbox.read` paths and the zone paths of the scope.
 - An entry that resolves to nothing, to a relative path, or to the real home or one of its ancestors stops the run.
@@ -441,7 +441,7 @@ Each sandboxed scope writes in one zone and is denied the others. The `state` zo
 - **Product sandbox.** The engine runs every script of the product and every check run under `srt` with the same rules as the agents of the scope. Code written by an agent therefore runs with the same denials as the agent. `build` and `test` reach the domains of `sandbox.allow`; `services`, `start`, `ready` and check runs, which receive the app secrets, reach only `localhost`. Settings in [Part II](#product-sandbox-settings).
 - **Relaxed profile.** The product sandbox with the network open to every domain, reads and writes open everywhere except the zones denied to the scope and the project repo, and `sandbox.extra` merged. `test-host` always runs under it; `sandbox.relaxed` lists the other scripts that do (`build`, `test`, `services`, `start`, `check-run`). A relaxed build-scope script cannot read `state` or `holdout`; a relaxed check run cannot read `state` or `work`.
 - A check run executes from a copy of `run` in `holdout/runs/<run>/<exec>/scope/check/`. Product code it loads (a test runner, a compiled overlay) can read that copy, the overlays and the checkout, never `check.md` or another check, and writes only inside the verify scope, which the engine deletes with the checkout.
-- `sandbox.extra` carries the sandbox options a toolchain needs and heideng does not model. It is merged into every worker and product sandbox and cannot reopen a denied zone. The report lists each of its leaves under "Isolation weakened".
+- `sandbox.extra` carries the sandbox options a toolchain needs and heideng does not model. It is merged into every worker and product sandbox and cannot reopen a denied zone.
 
 #### Declared reads and audit
 
@@ -472,7 +472,7 @@ A red doctor rejects the command (exit 5) before any node, with the failing comm
 #### Credentials and secrets
 
 - The LLM nodes authenticate from the environment of `heideng`, see [Credentials](#credentials).
-- App secrets: names in `.heideng/env`, values in `state/env` as `NAME=value` lines that the person writes. `state/env` holds test secrets only, never production credentials. Doctor reports every name without a value. The engine injects the values into `services`, `start`, `ready` and check runs. Agents, `build` and `test` see only the names, so `build` and `test` give the worker and the engine the same result.
+- App secrets: names in `.heideng/env`, values in `state/env` as `NAME=value` lines that the person writes. `state/env` holds test secrets only. Doctor reports every name without a value. The engine injects the values into `services`, `start`, `ready` and check runs. Agents, `build` and `test` see only the names, so `build` and `test` give the worker and the engine the same result.
 
 ### Stops, budgets and escalations
 
@@ -489,7 +489,7 @@ A red doctor rejects the command (exit 5) before any node, with the failing comm
 - Every non-interactive LLM call has the per-call limits of `nodes.defaults`, overridable per node: `max_usd`, `max_turns`, `timeout`. A call that exhausts one counts as a red visit for implement, a pass without progress for the `holdout` and `plan` loops, no notes for review, and a red docs node.
 - The engine writes each escalation from a template in `state/runs/<run>/escalations/<id>.md`, with what, why, evidence, the exhausted limit if any, and how to close.
 - Closing: `heideng resolve <id>`, see [Resolve](#resolve-heideng-resolve-id).
-- `heideng resume` gives each exhausted limit a new allowance equal to its configured value; `--add-usd`, `--add-time`, `--add-passes` set an explicit allowance. It closes the open escalations caused by those limits and records the command under `## Resolved`. With other escalations open it rejects the run and prints their `heideng resolve` commands.
+- `heideng resume` grants new allowances to the exhausted limits, see [State and resume](#state-and-resume).
 
 | Escalation kind | Opened by |
 |---|---|
@@ -586,6 +586,7 @@ holdout/
 
 - `exec` is the deterministic key of a node execution: `r<n>/<ticket>/v<n>`, `r<n>/host`, `r<n>/verify`, `r<n>/review`, `holdout/v<n>`, `plan/v<n>`, `docs/v<n>`, `regression`, `regression/main`, `merge-main`, `report`.
 - Ctrl-C (SIGINT), SIGTERM and SIGHUP on the engine kill the node in progress and end the run as `stopped` with reason `interrupted`; `heideng resume` continues it. `heideng abort` writes `aborted` into `run.json`, then sends SIGTERM; the run ends as `aborted`.
+- `heideng resume` gives each exhausted limit a new allowance equal to its configured value; `--add-usd`, `--add-time`, `--add-passes` set an explicit allowance. It closes the open escalations caused by those limits and records the command under `## Resolved`. With other escalations open it rejects the run and prints their `heideng resolve` commands.
 - `heideng resume` restarts the node in progress. It resets an `implementing` ticket to its base sha, checks a `done` ticket with `git merge-base --is-ancestor`, restarts verify, review, docs and regression from scratch, and treats merge main as described in [Merge main](#merge-main).
 - A command that finds `run.lock` with the pid of no running heideng process treats the engine as crashed: the run has no `run.end`, `heideng run` rejects it as active, `heideng resume` takes the lock and restarts the node in progress. `heideng resume` with the pid of a running engine is rejected.
 - `run.lock` is released when the run ends `merged`, `failed`, `aborted` or `stopped` with reason `spec-changed` or `holdout-changed`, and by `heideng close`.
@@ -610,7 +611,7 @@ One JSON object per line: `{ v, seq, ts, type, exec, ticket?, visit?, round?, da
 
 ### Report
 
-`state/runs/<run>/report.md`, written by the engine, "To do for you" first.
+`state/runs/<run>/report.md`, written by the engine, "To do for you" first. "Isolation weakened" lists each script under the relaxed profile, each host directory in `sandbox.write` and each leaf of `sandbox.extra`.
 
 ```markdown
 # <spec> - run <id>
