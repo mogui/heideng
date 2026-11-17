@@ -4,6 +4,7 @@
   "description": "Spec to implemented code, unattended after one landing question: to-tickets then implement-spec, every subagent an Orca worker, skill questions answered by an Orca advisor worker.",
   "dependencies": [
     "mattpocock-skills@mattpocock",
-    "ponytail@ponytail"
+    "ponytail@ponytail",
+    "pstack@pstack-claude"
   ]
 }

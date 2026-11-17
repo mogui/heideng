@@ -18,7 +18,7 @@ Interrupted run (new session, compacted context, user asks "where are we"): foll
 All hold before step 0; on a miss, stop and tell the user the fix.
 
 - `orca --version` works and the `orchestration` skill is available (both ship with the Orca app). Load `orchestration` once and follow its run/worker/ask protocol for everything below.
-- Plugin dependencies enabled: `mattpocock-skills` (`to-tickets`, `implement-spec`, `tdd`, `code-review`, `pr`) and `ponytail` (`ponytail-review`). Skill names below drop the plugin prefix.
+- Plugin dependencies enabled: `mattpocock-skills` (`to-tickets`, `implement-spec`, `tdd`, `code-review`, `pr`), `ponytail` (`ponytail-review`), and `pstack` (`create-verification-skill`, `maintain-verification-skill`). Skill names below drop the plugin prefix.
 - `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
 - Repo id from `orca repo list --json`. Build and test commands from the repo (README, package manifest, scripts), or from the spec when there is no code yet.
 
@@ -49,7 +49,16 @@ Done: advisor dispatch id in `state.md`.
 
 Load `to-tickets` and follow it. Write the draft breakdown to `$F/tickets/draft.md`. Its quiz (granularity, blocking edges, merge/split, spec coverage) goes to the advisor, which writes the verdict to `$F/tickets/review.md`. Apply the changes, then publish to the tracker with native blocking links (older `gh` lacks `--blocked-by`: use the dependencies API from `docs/agents/issue-tracker.md`). Tickets needing a real login or GUI get `ready-for-human` and stay outside the implement graph.
 
-Done: every ticket published with its blocking links and listed in `state.md` as `queued` or `human`.
+Then add the **verify ticket** `V`, which blocks every other agent ticket except the skeleton:
+
+| Repo state | `V` runs | `V` blocked by |
+|---|---|---|
+| no `.claude/skills/verify/` | `create-verification-skill` | the **skeleton**: the first tracer bullet, after which the app launches and one path works end to end (the advisor's quiz confirms ticket 01 is one) |
+| `.claude/skills/verify/` exists | `maintain-verification-skill` on the base branch: its live pass is the **baseline** of what worked before this spec | nothing |
+
+Either way `V` also adds one feature file per acceptance criterion of the spec, marked `pending` until its ticket lands, and its spec says: ship by committing on its branch (no PR); product gaps go in its report.
+
+Done: every ticket, `V` included, published with its blocking links and listed in `state.md` as `queued` or `human`.
 
 ## 3. Implement
 
@@ -63,19 +72,31 @@ Load `implement-spec` and follow it, with these mappings:
 | merger subagent | see Merging |
 | code-review | two read-only review workers in parallel on the integration branch vs its base, `--worktree current`: one runs `code-review`, one runs `ponytail-review`; each writes `$F/review/<skill>.md` |
 | code-review fixes | one implementer worker (new worktree) fixes the findings of both review files; where they conflict, correctness and the spec win over cutting code |
+| verify ticket `V` | Orca worker, new worktree like an implementer, spec from step 2 instead of the template; merged like any ticket, its edits to `.claude/skills/verify/` included |
 
-Build each `$F/specs/<N>.md` from [implementer-template.md](implementer-template.md), filling every `__PLACEHOLDER__`.
+Build each `$F/specs/<N>.md` from [implementer-template.md](implementer-template.md), filling every `__PLACEHOLDER__`. `__FEATURE_FILES__` lists the feature files of the acceptance criteria the ticket covers; for the skeleton, which runs before `V`, drop rule 4.
 
 Launch every **frontier** ticket (all blockers merged) in parallel. On each `worker_done`: merge, recompute the frontier, launch the newly unblocked tickets. The reviews may start while only docs-only tickets remain.
 
-Done: every non-`human` ticket `merged`, both reviews written, the fix worker's branch merged. Then Landing and cleanup.
+Done: every non-`human` ticket `merged`, both reviews written, the fix worker's branch merged.
 
 ### Merging
 
 - Implementer already merged the integration tip (`git merge-base --is-ancestor <integration> <branch>`): `git merge --ff-only`.
 - Branch diverged but merges clean: `git merge --no-ff`, then build + tests on the integration branch.
 - Conflicts, or several diverged branches at once: one merger worker in the integration branch's worktree; queue extra branches to it with `send`. Its spec names the **hotspot** (the shared seam both tickets touched, from their notes) and how to combine it.
+- Implementer branch edits `.claude/skills/verify/` outside its `__FEATURE_FILES__`: route the diff to the advisor before merging.
 - A merge changed a seam a running implementer touches: `send` that implementer a one-paragraph heads-up pointing at the note.
+
+## 4. Final verify
+
+Runs after the review fix is merged: the code it sees is the code that lands.
+
+1. One **verifier** worker, `--worktree current`, runs `maintain-verification-skill` on the integration branch: every feature in the map driven live, no `pending` left. Drift in the map it fixes and commits; product gaps go in its report, each labelled with its acceptance criterion or as a regression against the baseline.
+2. Each product gap becomes a fix ticket: published to the tracker, spec from the template with the gap's feature file, launched, and merged as in step 3.
+3. Fix tickets merged: run the verifier again. At most 2 rounds; gaps still open go to the final summary as `NEEDS USER`. Record round and outcome in `state.md`.
+
+Done: verifier outcome `clean`, or the round limit reached with every open gap listed.
 
 ## Supervision
 
@@ -88,7 +109,7 @@ Silence is the failure mode: a worker waiting on an answer that never arrived lo
 
 ## Ledger
 
-Keep `$F/state.md` current at every milestone, one line per item: run id, advisor root dispatch, integration branch, landing decision, then per ticket `#N status dispatch branch sha` with status in `queued | running | asking | done | merged | human`. It is the cheap map [RESUME.md](RESUME.md) rebuilds from; the tracker, git, and Orca are the sources of truth.
+Keep `$F/state.md` current at every milestone, one line per item: run id, advisor root dispatch, integration branch, landing decision, verify round and outcome, then per ticket `#N status dispatch branch sha` with status in `queued | running | asking | done | merged | human`. It is the cheap map [RESUME.md](RESUME.md) rebuilds from; the tracker, git, and Orca are the sources of truth.
 
 ## Landing and cleanup
 
@@ -98,4 +119,4 @@ Keep `$F/state.md` current at every milestone, one line per item: run id, adviso
 
 ## Reporting
 
-Short status at each milestone: tickets published, each ticket merged, review done, landed, cleaned up. Each names what runs now and what each worker waits on. Every merge report lists what could not be verified without a GUI or real accounts; the final summary collects them.
+Short status at each milestone: tickets published, `V` merged, each ticket merged, review done, each verify round, landed, cleaned up. Each names what runs now and what each worker waits on. Every merge report lists what could not be verified without a GUI or real accounts; the final summary collects them.

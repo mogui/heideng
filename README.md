@@ -7,6 +7,7 @@ Spec-to-code factory for Claude Code. This repo is the Claude Code plugin market
 ```
 claude plugin marketplace add mattpocock/skills
 claude plugin marketplace add DietrichGebert/ponytail
+claude plugin marketplace add michael-denyer/pstack-claude
 claude plugin marketplace add mogui/heideng
 claude plugin install heideng-orca@heideng
 ```
@@ -15,7 +16,7 @@ claude plugin install heideng-orca@heideng
 
 | Plugin | Skill | Requires |
 |---|---|---|
-| `heideng-orca` | `/heideng-orca:run <spec>`: spec to implemented code, every subagent run as an Orca worker | [Orca](https://github.com/stablyai/orca) app and CLI; plugins `mattpocock-skills@mattpocock`, `ponytail@ponytail` |
+| `heideng-orca` | `/heideng-orca:run <spec>`: spec to implemented code, every subagent run as an Orca worker | [Orca](https://github.com/stablyai/orca) app and CLI; plugins `mattpocock-skills@mattpocock`, `ponytail@ponytail`, `pstack@pstack-claude` |
 
 ## Layout
 

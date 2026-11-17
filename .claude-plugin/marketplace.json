@@ -1,7 +1,7 @@
 {
   "name": "heideng",
   "owner": { "name": "Niko Usai" },
-  "allowCrossMarketplaceDependenciesOn": ["mattpocock", "ponytail"],
+  "allowCrossMarketplaceDependenciesOn": ["mattpocock", "ponytail", "pstack-claude"],
   "plugins": [
     {
       "name": "heideng-orca",

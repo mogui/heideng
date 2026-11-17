@@ -6,7 +6,7 @@ The run outlives any one coordinator context. Scratch dir `$F` as in SKILL.md. R
 
 | Source | Gives |
 |---|---|
-| `$F/state.md` | last known run id, advisor dispatch, integration branch, landing decision, per-ticket status |
+| `$F/state.md` | last known run id, advisor dispatch, integration branch, landing decision, verify round and outcome, per-ticket status |
 | `orca orchestration run-list` / `run-use --run <id>` | rebinds you as coordinator of the existing Run |
 | tracker (`docs/agents/issue-tracker.md`) | every ticket, its blockers, open/closed |
 | `git log --first-parent --oneline <integration>` (unfiltered) | tickets already merged |
@@ -23,6 +23,7 @@ The run outlives any one coordinator context. Scratch dir `$F` as in SKILL.md. R
 - Dispatch gone without `worker_done`, branch has a ticket commit: build + tests on the branch; green: merge it; red: restart.
 - Dispatch gone without `worker_done`, branch has no ticket commit: restart the ticket with a fresh implementer from `$F/specs/<N>.md`.
 - Blockers all merged and no dispatch: frontier; launch it.
+- All tickets merged, Final verify not `clean`: resume step 4 at the round recorded in `state.md`.
 
 Never restart a ticket that is already merged or has a live working dispatch.
 
