@@ -1,0 +1,12 @@
+{
+  "name": "heideng",
+  "owner": { "name": "Niko Usai" },
+  "allowCrossMarketplaceDependenciesOn": ["mattpocock", "ponytail"],
+  "plugins": [
+    {
+      "name": "heideng-orca",
+      "source": "./plugins/heideng-orca",
+      "description": "Spec to implemented code, unattended after one landing question, every subagent an Orca worker."
+    }
+  ]
+}
