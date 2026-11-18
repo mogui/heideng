@@ -1,6 +1,6 @@
 ---
 name: run
-description: "Turn a spec into implemented code, unattended after one landing question: /to-tickets then /implement-spec, every subagent an Orca worker, skill questions answered by an Orca advisor worker."
+description: "Turn a spec into implemented code, unattended after one landing question: tickets then implementation, every subagent an Orca worker, skill questions answered by an Orca advisor worker."
 argument-hint: "<path to spec, e.g. docs/SPEC.md>"
 disable-model-invocation: true
 ---
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Input: spec at `$ARGUMENTS` (default `docs/SPEC.md`).
 
-You are the **coordinator** of an unattended factory. You run Matt Pocock's `/to-tickets` then `/implement-spec`, with one substitution: every subagent those skills ask for is an **Orca worker**, and every question a skill would ask the user goes to the **advisor** worker. The user hears from you only at step 0, on `NEEDS USER`, and in status reports.
+You are the **coordinator** of an unattended factory. You follow [to-tickets.md](to-tickets.md) then [implement-spec.md](implement-spec.md): every subagent is an **Orca worker**, and every question a skill would ask the user goes to the **advisor** worker. The user hears from you only at step 0, on `NEEDS USER`, and in status reports.
 
 Interrupted run (new session, compacted context, user asks "where are we"): follow [RESUME.md](RESUME.md) before anything else.
 
@@ -18,7 +18,7 @@ Interrupted run (new session, compacted context, user asks "where are we"): foll
 All hold before step 0; on a miss, stop and tell the user the fix.
 
 - `orca --version` works and the `orchestration` skill is available (both ship with the Orca app). Load `orchestration` once and follow its run/worker/ask protocol for everything below.
-- Plugin dependencies enabled: `mattpocock-skills` (`to-tickets`, `implement-spec`, `tdd`, `code-review`, `pr`), `ponytail` (`ponytail-review`), and `pstack` (`create-verification-skill`, `maintain-verification-skill`). Skill names below drop the plugin prefix.
+- Plugin dependencies enabled: `mattpocock-skills` (`tdd`, `code-review`, `pr`), `ponytail` (`ponytail-review`), and `pstack` (`create-verification-skill`, `maintain-verification-skill`). Skill names below drop the plugin prefix.
 - `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
 - Repo id from `orca repo list --json`. Build and test commands from the repo (README, package manifest, scripts), or from the spec when there is no code yet.
 
@@ -47,46 +47,15 @@ Done: advisor dispatch id in `state.md`.
 
 ## 2. Tickets
 
-Load `to-tickets` and follow it. Write the draft breakdown to `$F/tickets/draft.md`. Its quiz (granularity, blocking edges, merge/split, spec coverage) goes to the advisor, which writes the verdict to `$F/tickets/review.md`. Apply the changes, then publish to the tracker with native blocking links (older `gh` lacks `--blocked-by`: use the dependencies API from `docs/agents/issue-tracker.md`). Tickets needing a real login or GUI get `ready-for-human` and stay outside the implement graph.
-
-Then add the **verify ticket** `V`, which blocks every other agent ticket except the skeleton:
-
-| Repo state | `V` runs | `V` blocked by |
-|---|---|---|
-| no `.claude/skills/verify/` | `create-verification-skill` | the **skeleton**: the first tracer bullet, after which the app launches and one path works end to end (the advisor's quiz confirms ticket 01 is one) |
-| `.claude/skills/verify/` exists | `maintain-verification-skill` on the base branch: its live pass is the **baseline** of what worked before this spec | nothing |
-
-Either way `V` also adds one feature file per acceptance criterion of the spec, marked `pending` until its ticket lands, and its spec says: ship by committing on its branch (no PR); product gaps go in its report.
+Follow [to-tickets.md](to-tickets.md): draft the breakdown with the **skeleton** and the **verify ticket** `V`, quiz the advisor, publish.
 
 Done: every ticket, `V` included, published with its blocking links and listed in `state.md` as `queued` or `human`.
 
 ## 3. Implement
 
-Load `implement-spec` and follow it, with these mappings:
-
-| implement-spec says | Do |
-|---|---|
-| integration branch | `git switch -c <spec-slug>-impl` off the current branch; commit any pending agent-config files on it |
-| exploration subagent | Orca worker, `--worktree current`, writes notes to `$F/notes/` |
-| implementer subagent | Orca worker per ticket: `--worktree new-top-level --repo id:<repo> --name <slug>-t<N> --base-branch <integration> --spec-file $F/specs/<N>.md` |
-| merger subagent | see Merging |
-| code-review | two read-only review workers in parallel on the integration branch vs its base, `--worktree current`: one runs `code-review`, one runs `ponytail-review`; each writes `$F/review/<skill>.md` |
-| code-review fixes | one implementer worker (new worktree) fixes the findings of both review files; where they conflict, correctness and the spec win over cutting code |
-| verify ticket `V` | Orca worker, new worktree like an implementer, spec from step 2 instead of the template; merged like any ticket, its edits to `.claude/skills/verify/` included |
-
-Build each `$F/specs/<N>.md` from [implementer-template.md](implementer-template.md), filling every `__PLACEHOLDER__`. `__FEATURE_FILES__` lists the feature files of the acceptance criteria the ticket covers; for the skeleton, which runs before `V`, drop rule 4.
-
-Launch every **frontier** ticket (all blockers merged) in parallel. On each `worker_done`: merge, recompute the frontier, launch the newly unblocked tickets. The reviews may start while only docs-only tickets remain.
+Follow [implement-spec.md](implement-spec.md): integration branch, one implementer worker per frontier ticket, merge on each `worker_done`, `code-review` and `ponytail-review`, one fix worker.
 
 Done: every non-`human` ticket `merged`, both reviews written, the fix worker's branch merged.
-
-### Merging
-
-- Implementer already merged the integration tip (`git merge-base --is-ancestor <integration> <branch>`): `git merge --ff-only`.
-- Branch diverged but merges clean: `git merge --no-ff`, then build + tests on the integration branch.
-- Conflicts, or several diverged branches at once: one merger worker in the integration branch's worktree; queue extra branches to it with `send`. Its spec names the **hotspot** (the shared seam both tickets touched, from their notes) and how to combine it.
-- Implementer branch edits `.claude/skills/verify/` outside its `__FEATURE_FILES__`: route the diff to the advisor before merging.
-- A merge changed a seam a running implementer touches: `send` that implementer a one-paragraph heads-up pointing at the note.
 
 ## 4. Final verify
 

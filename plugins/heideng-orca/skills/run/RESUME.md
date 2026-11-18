@@ -17,7 +17,7 @@ The run outlives any one coordinator context. Scratch dir `$F` as in SKILL.md. R
 ## 2. Reconcile each ticket
 
 - On the integration branch: `merged`.
-- Branch exists, `worker_done` received, not on the integration branch: merge it (Merging in SKILL.md).
+- Branch exists, `worker_done` received, not on the integration branch: merge it (Merging in implement-spec.md).
 - Dispatch live with an unanswered `question`: route it to the advisor; answered but parked: verify the wake (Supervision).
 - Dispatch live and working: watch it.
 - Dispatch gone without `worker_done`, branch has a ticket commit: build + tests on the branch; green: merge it; red: restart.

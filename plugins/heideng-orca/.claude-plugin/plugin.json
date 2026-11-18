@@ -1,7 +1,7 @@
 {
   "name": "heideng-orca",
-  "version": "0.1.0",
-  "description": "Spec to implemented code, unattended after one landing question: to-tickets then implement-spec, every subagent an Orca worker, skill questions answered by an Orca advisor worker.",
+  "version": "0.2.0",
+  "description": "Spec to implemented code, unattended after one landing question: tickets then implementation, every subagent an Orca worker, skill questions answered by an Orca advisor worker.",
   "dependencies": [
     "mattpocock-skills@mattpocock",
     "ponytail@ponytail",
