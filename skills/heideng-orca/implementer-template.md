@@ -10,7 +10,7 @@ Context pointers (read, do not ask me to repeat them):
 - Repo checkouts for running the system (your worktree for __REPO__, integration worktrees for the others): __CHECKOUTS__
 
 Rules:
-1. Build the ticket test-first with the `mattpocock-skills:tdd` skill. Unit-test pure logic; behaviour that cannot be unit-tested is verified by the build succeeding.
+1. Build the ticket test-first with the `tdd` skill. Unit-test pure logic; behaviour that cannot be unit-tested is verified by the build succeeding.
 2. Implement only this ticket's scope, only in this worktree. The spec, the glossary, and the other checkouts are read-only.
 3. When the skill or the work needs a decision the spec and ticket do not settle (including the `tdd` seam confirmation), use orchestration `ask` to ask the coordinator and end your turn; you will be woken with the answer. If you are nudged instead, run `orca orchestration check` to read it. Ask once per decision point, bundling every open question; settle product decisions only through the answer.
 4. Prove the ticket live with the verify skill at `__HOME_DIR__/.claude/skills/verify/`: drive __FEATURE_FILES__ against the checkouts above and capture the evidence. The verify skill is read-only; report the feature-file updates it needs (drop `pending`, "Driving it", "Gotchas").

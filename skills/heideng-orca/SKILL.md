@@ -1,5 +1,5 @@
 ---
-name: run
+name: heideng-orca
 description: "Turn a spec into implemented code, unattended after one landing question: tickets then implementation, every subagent an Orca worker, skill questions answered by an Orca advisor worker."
 argument-hint: "<path to spec, e.g. docs/SPEC.md>"
 disable-model-invocation: true
@@ -18,10 +18,11 @@ Interrupted run (new session, compacted context, user asks "where are we"): foll
 All hold before step 0; on a miss, stop and tell the user the fix.
 
 - `orca --version` works and the `orchestration` skill is available (both ship with the Orca app). Load `orchestration` once and follow its run/worker/ask protocol for everything below.
-- Plugin dependencies enabled: `mattpocock-skills` (`tdd`, `code-review`, `pr`), `ponytail` (`ponytail-review`), and `pstack` (`create-verification-skill`, `maintain-verification-skill`). Skill names below drop the plugin prefix.
+- `souk --version` works, and the home repo's `souk.yaml` and `souk.lock` pass `souk sync --check`. They declare this skill and the skills workers use: `tdd`, `code-review`, `pr`, `ponytail-review`, `create-verification-skill`, `maintain-verification-skill` (fix: `souk init` if there is no `souk.yaml`, then `souk registry add heideng https://github.com/mogui/heideng` and `souk presets apply heideng`).
 - The `plannotator_inbox` tool is available (fix: `claude plugin marketplace add backnotprop/plannotator`, `claude plugin install plannotator@plannotator`, restart Claude Code). Run `plannotator inbox --help` once and follow it for block syntax, threads and replies.
 - You run in the **home repo**: the one holding the spec, and whose `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
 - Every `esistente` repo of the spec's `## Repos` (see [Repos](#repos)), and the home repo, is in `orca repo list --json` (fix: `orca repo add --path <abs path>`).
+- No repo other than the home repo has its own `souk.yaml` (fix: merge its declarations into the home repo's `souk.yaml` by hand).
 - Each such repo with a `.claude/settings.local.json`: tell the user that workers do not see it (new worktrees lack git-ignored files); protections workers need belong in `~/.claude/settings.json`. A warning, not a stop.
 
 **Scratch dir** `$F` = `/tmp/<home repo dir name>-factory/`, with `tickets/`, `specs/`, `notes/`, `review/`, and `state.md` (see Ledger). Workers run in other worktrees: every scratch path you hand to a worker or a CLI flag is absolute.
@@ -32,19 +33,28 @@ The spec's `## Repos` section is the index of the repos the run touches: one lin
 
 `repos.md`, beside the spec, is derived from that index at step 0 and committed on the home repo's integration branch. One line per repo: name, Orca id, absolute path of the main checkout, base branch, build command, test command. Build and test come from the repo (README, package manifest, scripts), or from the spec for a repo with no code yet. Tickets, workers, and [RESUME.md](RESUME.md) read it.
 
+## Worktrees
+
+Every worktree the run creates is ready before an agent runs in it:
+
+1. `orca worktree create --repo id:<repo id> --name <name> --branch <branch> --base-branch <base> --setup skip --json`. Its path is `result.worktree.path`. Orca reuses `--branch` only when that branch is absent or still at the base; otherwise it creates `<branch>-2`, so check `result.worktree.branch` is `refs/heads/<branch>`.
+2. Copy the home repo's `souk.yaml` and `souk.lock` into it, then `souk -C <path> sync --frozen`: every worker has every skill, in every repo.
+3. A worker runs in it with `orca orchestration worker-start --agent claude --worktree path:<path> ...`, without `--repo`, `--name` or `--base-branch`, which Orca rejects for existing worktrees.
+
 ## 0. Landing and repos
 
 Ask the user once, in one message:
 
-- How finished work lands, for every repo alike: push each integration branch and open one PR per repo that closes its tickets (recommended), merge to each base branch, or keep it local.
+- How finished work lands, for every repo alike: push each integration branch (recommended), merge to each base branch, or keep it local.
 - For each `nuovo` repo: create its remote, or keep it local.
 - When the spec has no `## Repos` but reads as several components (services, apps, libraries to create): the `## Repos` you propose. Rejected: single-repo run.
 
 This is the only outward-facing step; settling it now keeps the end of the run unattended. Then:
 
 1. Each `nuovo` repo: a sibling directory of the home repo, `git init`, one empty commit on `main`, `orca repo add --path <abs path>`; its remote, if approved.
-2. Each repo: its **integration worktree**, `orca worktree create --repo id:<repo id> --name <spec-slug>-impl-<repo name> --branch <spec-slug>-impl --base-branch <base> --json`. Its path is `result.worktree.path`. Orca reuses `--branch` only when that branch is absent or still at the base; otherwise it creates `<branch>-2`, so check `result.worktree.branch` is `refs/heads/<spec-slug>-impl`. Copy pending agent-config files from the main checkout into it and commit them there.
-3. In the home repo's integration worktree: the approved `## Repos` added to the spec, `repos.md` written, one commit.
+2. Each repo: append to `$(git -C <repo> rev-parse --git-common-dir)/info/exclude`, shared by all its worktrees, the lines missing among `souk.yaml`, `souk.lock`, and `.claude/skills/<name>/` for each resource in `souk.lock`. Workers then never commit the souk files.
+3. Each repo: its **integration worktree** ([Worktrees](#worktrees)), name `<spec-slug>-impl-<repo name>`, branch `<spec-slug>-impl`, from its base branch. Copy pending agent-config files from the main checkout into it and commit them there.
+4. In the home repo's integration worktree: the approved `## Repos` added to the spec, `repos.md` written, one commit.
 
 From here on, "the spec" is the copy in the home repo's integration worktree; every path to it you hand a worker is that one.
 
@@ -97,7 +107,7 @@ Everything the user must decide or do after step 0 goes to the Plannotator Inbox
 - **Decision** (a `NEEDS USER` answer, a verify gap left after round 2): one `:::question` block per decision, written for someone who has not followed the run. It says what the choice affects in product terms, lists the choices, and carries `Recommended:`, `Stakes:`, and `Holds up: #N; #M` naming the tickets that wait. Add `Stopped:` when no ticket can advance without the answer. Mark the waiting tickets `asking` and keep working the rest of the frontier.
 - **Human task** that blocks agent tickets (a login, a real account, a GUI step): one `:::action` block with `Where:` and `Holds up:`.
 - **Answer.** It arrives as a new turn starting `Plannotator Inbox: <title> (<reply id>)`. Relay the pick to the waiting worker with `orca orchestration reply`, write it to `$F/notes/`, and confirm in the thread with `reply_to: <reply id>`. Questions the reply leaves open stay open: wait for them, in the Inbox only. Withdraw a question the run made moot with `supersedes`.
-- **Answer after landing.** A decision that changes code becomes a fix ticket, implemented, verified and landed as steps 3, 4 and Landing describe. With a PR, rerun `export-decisions` (Landing) after every answer.
+- **Answer after landing.** A decision that changes code becomes a fix ticket, implemented, verified and landed as steps 3, 4 and Landing describe. After landing, rerun the decisions export (Landing) after every answer.
 
 ## Supervision
 
@@ -116,11 +126,11 @@ Keep `$F/state.md` current at every milestone, one line per item: run id, adviso
 
 1. In each repo's integration worktree: full test suite and build green.
 2. Land per step 0, repo by repo in the order the tickets depend on each other:
-   - PR: one per repo; the `pr` skill writes each body, references the PRs of the other repos, and closes that repo's agent tickets (`Closes #N`, qualified as `<owner>/<home repo>#N` when the tracker lives in another repo). Pass every PR ref as `pulls` on the final summary message, then run `plannotator inbox export-decisions --thread <thread id> --pr <ref>` for each PR so the user's decisions sit on it.
+   - Push: push the integration branch. When the project documents how to open a pull request (a forge CLI in `docs/agents/` or the README), open one per repo: the `pr` skill writes each body, references the other repos' PRs, and closes that repo's agent tickets with the syntax of `docs/agents/issue-tracker.md`. Otherwise the pushed branch is the deliverable: the final summary names each repo's branch, and a human opens the PRs. Pass every PR ref as `pulls` on the final summary message. Decisions: `plannotator inbox export-decisions --thread <thread id> --pr <ref>` for each GitHub (`owner/repo#N`) or GitLab (`group/project!N`) PR; otherwise `--out $F/decisions.md`, attached to the final summary.
    - Merge: `git merge --ff-only <spec-slug>-impl` in the repo's main checkout when it is on its base branch and clean; otherwise a `:::action` in the Inbox thread naming the repo and the command.
 
    Leave `ready-for-human` tickets and any parent/map issue open, and say so.
-3. Cleanup. For each implementer worktree, in its repo, confirm its branch is an ancestor of the integration branch, then `orca worktree rm --worktree path:<abs path> --delete-branch`. PR or merge: remove each integration worktree with `orca worktree rm --worktree path:<abs path>`, keeping its branch. Local: keep the integration worktrees and list their paths in the final summary. Release the advisor with `worker-release`.
+3. Cleanup. For each implementer worktree, in its repo, confirm its branch is an ancestor of the integration branch, then `orca worktree rm --worktree path:<abs path> --delete-branch`. Push or merge: remove each integration worktree with `orca worktree rm --worktree path:<abs path>`, keeping its branch. Local: keep the integration worktrees and list their paths in the final summary. Release the advisor with `worker-release`.
 
 ## Reporting
 

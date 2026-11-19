@@ -1,31 +1,40 @@
 # Heideng
 
-Spec-to-code factory for Claude Code. This repo is the Claude Code plugin marketplace `heideng`, plus the specs that drive it.
+Spec-to-code factory for Claude Code. This repo is a `souk` registry, plus the specs that drive it.
 
 ## Install
 
+Requires the [Orca](https://github.com/stablyai/orca) app and CLI, `souk`, and the Plannotator plugin:
+
 ```
-claude plugin marketplace add mattpocock/skills
-claude plugin marketplace add DietrichGebert/ponytail
-claude plugin marketplace add michael-denyer/pstack-claude
-claude plugin marketplace add mogui/heideng
-claude plugin install heideng-orca@heideng
+claude plugin marketplace add backnotprop/plannotator
+claude plugin install plannotator@plannotator
 ```
 
-## Plugins
+In the home repo (the one holding the spec):
 
-| Plugin | Skill | Requires |
-|---|---|---|
-| `heideng-orca` | `/heideng-orca:run <spec>`: spec to implemented code, every subagent run as an Orca worker | [Orca](https://github.com/stablyai/orca) app and CLI; plugins `mattpocock-skills@mattpocock`, `ponytail@ponytail`, `pstack@pstack-claude` |
+```
+souk init                       # when the repo has no souk.yaml
+souk registry add heideng https://github.com/mogui/heideng
+souk presets apply heideng
+```
+
+The `heideng` preset installs the `heideng-orca` skill and the skills its workers use. The run copies the home repo's `souk.yaml` and `souk.lock` into every worktree it creates and syncs them, so every worker in every repo has the same skills.
+
+## Skills
+
+| Skill | Use |
+|---|---|
+| `heideng-orca` | `/heideng-orca <spec>`: spec to implemented code across one or more repos, every subagent an Orca worker |
 
 ## Layout
 
 | Path | Content |
 |---|---|
-| `.claude-plugin/marketplace.json` | marketplace `heideng` |
-| `plugins/<name>/` | one directory per plugin |
+| `skills/<name>/` | one directory per skill |
+| `presets/heideng.yaml` | the `heideng` preset: `heideng-orca` and its dependencies |
 | `specs/` | spec versions, see [specs/README.md](specs/README.md) |
 
 ## Releases
 
-Bump `version` in `plugins/<name>/.claude-plugin/plugin.json`, then tag `<name>--v<version>` (e.g. `heideng-orca--v0.1.0`) and push the tag.
+Tag `v<version>` and push the tag. Pin a release with `--ref v<version>` on the `heideng` registry alias.

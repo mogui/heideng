@@ -1,0 +1,19 @@
+registries:
+  heideng: https://github.com/mogui/heideng
+skills:
+  - source: heideng
+    include:
+      - skills/heideng-orca
+  - source: https://github.com/mattpocock/skills
+    include:
+      - skills/engineering/tdd
+      - skills/engineering/code-review
+      - skills/engineering/pr
+      - skills/engineering/setup-matt-pocock-skills
+  - source: https://github.com/DietrichGebert/ponytail
+    include:
+      - skills/ponytail-review
+  - source: https://github.com/michael-denyer/pstack-claude
+    include:
+      - plugins/pstack/skills/create-verification-skill
+      - plugins/pstack/skills/maintain-verification-skill

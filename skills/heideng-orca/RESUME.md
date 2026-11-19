@@ -20,14 +20,14 @@ The run outlives any one coordinator context. Scratch dir `$F` as in SKILL.md. R
 
 Each ticket is checked against the integration branch of its own repo.
 
-- Integration worktree missing while its branch exists: `orca worktree create --repo id:<repo id> --name <spec-slug>-impl-<repo name> --branch <spec-slug>-impl-resume --base-branch <spec-slug>-impl --json`, then in `result.worktree.path` run `git switch <spec-slug>-impl` and `git branch -D <spec-slug>-impl-resume`; record the path in `state.md`.
+- Integration worktree missing while its branch exists: a worktree ([Worktrees](SKILL.md#worktrees)) with branch `<spec-slug>-impl-resume` from `<spec-slug>-impl`, then in it `git switch <spec-slug>-impl` and `git branch -D <spec-slug>-impl-resume`; record the path in `state.md`.
 - On the integration branch: `merged`.
 - Branch exists, `worker_done` received, not on the integration branch: merge it (Merging in implement-spec.md).
 - Dispatch live with an unanswered `question`: route it to the advisor; answered but parked: verify the wake (Supervision).
 - Ticket `asking` on an Inbox question: answered in the thread: relay it (Human inbox in SKILL.md); still open: leave it waiting.
 - Dispatch live and working: watch it.
 - Dispatch gone without `worker_done`, branch has a ticket commit: build + tests on the branch; green: merge it; red: restart.
-- Dispatch gone without `worker_done`, branch has no ticket commit: restart the ticket with a fresh implementer from `$F/specs/<N>.md`.
+- Dispatch gone without `worker_done`, branch has no ticket commit: restart the ticket with a fresh implementer from `$F/specs/<N>.md`, in a new worktree as in implement-spec step 5.
 - Blockers all merged and no dispatch: frontier; launch it.
 - All tickets merged, Final verify not `clean`: resume step 4 at the round recorded in `state.md`.
 
