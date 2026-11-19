@@ -2,7 +2,7 @@
 
 Break the spec into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it, plus one **verify ticket** `V`.
 
-`$F` is the scratch dir of SKILL.md. The issue tracker and triage label vocabulary come from the repo's `## Agent skills` block.
+`$F` is the scratch dir of SKILL.md. The issue tracker and triage label vocabulary come from the home repo's `## Agent skills` block.
 
 ## 1. Gather context
 
@@ -29,13 +29,15 @@ Break the work into **tracer bullet** tickets.
 
 Give each ticket its **blocking edges**: the other tickets that must complete before it can start. A ticket with no blockers can start immediately.
 
-Mark the **skeleton**: the first tracer bullet, after which the app launches and one path works end to end.
+**One repo per ticket.** Every ticket carries `Repo:`, a name from `repos.md` (SKILL.md, Repos). A slice that crosses repos becomes one ticket per repo, chained by blocking edges in the order the layers depend on each other (API before the UI that calls it). Only the last ticket of the chain proves the slice live; the ones before it prove themselves with build and tests.
+
+Mark the **skeleton**: the first tracer bullet, after which the app launches and one path works end to end. A skeleton that crosses repos is a chain; "skeleton merged" means its last ticket merged.
 
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand-contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
 
 ## 4. Draft the verify ticket
 
-Add the **verify ticket** `V` to the breakdown. It blocks every other agent ticket except the skeleton.
+Add the **verify ticket** `V` to the breakdown, with `Repo:` the home repo, where `.claude/skills/verify/` lives. It blocks every other agent ticket except the skeleton. The verify skill takes the path of each repo checkout as a parameter and hardcodes none: the same skill drives the system from a ticket's worktree plus the integration worktrees of the other repos.
 
 | Repo state | `V` runs | `V` blocked by |
 |---|---|---|
@@ -51,6 +53,7 @@ Write `V`'s worker spec to `$F/specs/V.md`: the skill it runs, the feature files
 Write the proposed breakdown to `$F/tickets/draft.md` as a numbered list, `V` included. For each ticket, show:
 
 - **Title**: short descriptive name
+- **Repo**: the repo the ticket changes
 - **Blocked by**: which other tickets (if any) must complete first
 - **What it delivers**: the end-to-end behaviour this ticket makes work
 
@@ -61,6 +64,7 @@ Ask the advisor:
 - Should any tickets be merged or split further?
 - Does every acceptance criterion of the spec land in a ticket?
 - Is the skeleton a true tracer bullet: after it, does the app launch with one path working end to end?
+- Does each cross-repo chain run in the order its layers depend on each other, with its last ticket proving the slice live?
 
 The advisor writes its verdict to `$F/tickets/review.md`. Apply the changes and iterate until the advisor approves the breakdown.
 
@@ -81,6 +85,8 @@ Do NOT close or modify any parent issue.
 
 **What to build:** the end-to-end behaviour this ticket makes work, from the user's perspective, not a layer-by-layer implementation list.
 
+**Repo:** the repo name from `repos.md`.
+
 **Blocked by:** the numbers/titles of the tickets that gate this one, or "None (can start immediately)".
 
 **Status:** ready-for-agent
@@ -95,6 +101,10 @@ Do NOT close or modify any parent issue.
 ## Parent
 
 A reference to the parent issue on the tracker (if the source was an existing issue, otherwise omit this section).
+
+## Repo
+
+The repo name from `repos.md`.
 
 ## What to build
 

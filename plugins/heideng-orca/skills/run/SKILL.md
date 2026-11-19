@@ -20,14 +20,35 @@ All hold before step 0; on a miss, stop and tell the user the fix.
 - `orca --version` works and the `orchestration` skill is available (both ship with the Orca app). Load `orchestration` once and follow its run/worker/ask protocol for everything below.
 - Plugin dependencies enabled: `mattpocock-skills` (`tdd`, `code-review`, `pr`), `ponytail` (`ponytail-review`), and `pstack` (`create-verification-skill`, `maintain-verification-skill`). Skill names below drop the plugin prefix.
 - The `plannotator_inbox` tool is available (fix: `claude plugin marketplace add backnotprop/plannotator`, `claude plugin install plannotator@plannotator`, restart Claude Code). Run `plannotator inbox --help` once and follow it for block syntax, threads and replies.
-- `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
-- Repo id from `orca repo list --json`. Build and test commands from the repo (README, package manifest, scripts), or from the spec when there is no code yet.
+- You run in the **home repo**: the one holding the spec, and whose `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
+- Every `esistente` repo of the spec's `## Repos` (see [Repos](#repos)), and the home repo, is in `orca repo list --json` (fix: `orca repo add --path <abs path>`).
+- Each such repo with a `.claude/settings.local.json`: tell the user that workers do not see it (new worktrees lack git-ignored files); protections workers need belong in `~/.claude/settings.json`. A warning, not a stop.
 
-**Scratch dir** `$F` = `/tmp/<repo dir name>-factory/`, with `tickets/`, `specs/`, `notes/`, `review/`, and `state.md` (see Ledger). Workers run in other worktrees: every scratch path you hand to a worker or a CLI flag is absolute.
+**Scratch dir** `$F` = `/tmp/<home repo dir name>-factory/`, with `tickets/`, `specs/`, `notes/`, `review/`, and `state.md` (see Ledger). Workers run in other worktrees: every scratch path you hand to a worker or a CLI flag is absolute.
 
-## 0. Landing decision
+## Repos
 
-Ask the user once how finished work lands: push the integration branch and open a PR that closes the tickets (recommended), merge to the base branch, or keep it local. This is the only outward-facing step; settling it now keeps the end of the run unattended. Done: decision written to `state.md`.
+The spec's `## Repos` section is the index of the repos the run touches: one line per repo with name, role in the system, and `esistente` or `nuovo`. The home repo is always in it, even with no code. A spec without the section is a single-repo run: the home repo is the only repo, same path through every step.
+
+`repos.md`, beside the spec, is derived from that index at step 0 and committed on the home repo's integration branch. One line per repo: name, Orca id, absolute path of the main checkout, base branch, build command, test command. Build and test come from the repo (README, package manifest, scripts), or from the spec for a repo with no code yet. Tickets, workers, and [RESUME.md](RESUME.md) read it.
+
+## 0. Landing and repos
+
+Ask the user once, in one message:
+
+- How finished work lands, for every repo alike: push each integration branch and open one PR per repo that closes its tickets (recommended), merge to each base branch, or keep it local.
+- For each `nuovo` repo: create its remote, or keep it local.
+- When the spec has no `## Repos` but reads as several components (services, apps, libraries to create): the `## Repos` you propose. Rejected: single-repo run.
+
+This is the only outward-facing step; settling it now keeps the end of the run unattended. Then:
+
+1. Each `nuovo` repo: a sibling directory of the home repo, `git init`, one empty commit on `main`, `orca repo add --path <abs path>`; its remote, if approved.
+2. Each repo: its **integration worktree**, `orca worktree create --repo id:<repo id> --name <spec-slug>-impl-<repo name> --branch <spec-slug>-impl --base-branch <base> --json`. Its path is `result.worktree.path`. Orca reuses `--branch` only when that branch is absent or still at the base; otherwise it creates `<branch>-2`, so check `result.worktree.branch` is `refs/heads/<spec-slug>-impl`. Copy pending agent-config files from the main checkout into it and commit them there.
+3. In the home repo's integration worktree: the approved `## Repos` added to the spec, `repos.md` written, one commit.
+
+From here on, "the spec" is the copy in the home repo's integration worktree; every path to it you hand a worker is that one.
+
+Done: landing decision, remote decisions, and every integration worktree path written to `state.md`.
 
 ## 1. Advisor
 
@@ -38,7 +59,7 @@ orca orchestration worker-start --agent claude --worktree current --keep-open \
   --task-title "Product advisor" --spec "<advisor spec>" --json
 ```
 
-Advisor spec: read-only; read the spec, the glossary/ADRs, and (once published) the tickets. For each question received, reply with `worker_done` whose body is the answer, labelled with the ticket: decisive, cites the spec section, picks the simplest option consistent with the spec when it is silent. Prefix `NEEDS USER` only for irreversible or outward-facing decisions.
+Advisor spec: read-only; read the spec, `repos.md`, the glossary/ADRs, and (once published) the tickets. For each question received, reply with `worker_done` whose body is the answer, labelled with the ticket: decisive, cites the spec section, picks the simplest option consistent with the spec when it is silent. Prefix `NEEDS USER` only for irreversible or outward-facing decisions.
 
 Route every question (from a skill you run, or an implementer `ask`) with `orca orchestration send --to dispatch:<advisor root dispatch>`, then relay the answer verbatim with `orca orchestration reply --id <msg>`. The advisor answers one question per `worker_done`; between questions it shows `succeeded`/`unverifiable`, which is idle, and the next `send` reopens it. A `NEEDS USER` answer goes to the user as a question in the Inbox thread ([Human inbox](#human-inbox)); the advisor's pick is its `Recommended:` line.
 
@@ -54,15 +75,15 @@ Done: every ticket, `V` included, published with its blocking links and listed i
 
 ## 3. Implement
 
-Follow [implement-spec.md](implement-spec.md): integration branch, one implementer worker per frontier ticket, merge on each `worker_done`, `code-review` and `ponytail-review`, one fix worker.
+Follow [implement-spec.md](implement-spec.md): one implementer worker per frontier ticket in its repo, merge on each `worker_done` into that repo's integration worktree, `code-review` and `ponytail-review` across repos, one fix worker per repo with findings.
 
-Done: every non-`human` ticket `merged`, both reviews written, the fix worker's branch merged.
+Done: every non-`human` ticket `merged`, both reviews written, every fix worker's branch merged.
 
 ## 4. Final verify
 
 Runs after the review fix is merged: the code it sees is the code that lands.
 
-1. One **verifier** worker, `--worktree current`, runs `maintain-verification-skill` on the integration branch: every feature in the map driven live, no `pending` left. Drift in the map it fixes and commits; product gaps go in its report, each labelled with its acceptance criterion or as a regression against the baseline.
+1. One **verifier** worker, `--worktree path:<home repo integration worktree>`, runs `maintain-verification-skill` with the system started from every repo's integration worktree: every feature in the map driven live, no `pending` left. It first applies `$F/notes/verify-updates.md` to the feature files. Drift in the map it fixes and commits; product gaps go in its report, each labelled with its acceptance criterion or as a regression against the baseline.
 2. Each product gap becomes a fix ticket: published to the tracker, spec from the template with the gap's feature file, launched, and merged as in step 3.
 3. Fix tickets merged: run the verifier again. At most 2 rounds; each gap still open goes to the Inbox thread as a question (fix it in a follow-up, or accept it as is), with the verifier's evidence attached. Record round and outcome in `state.md`.
 
@@ -89,13 +110,17 @@ Silence is the failure mode: a worker waiting on an answer that never arrived lo
 
 ## Ledger
 
-Keep `$F/state.md` current at every milestone, one line per item: run id, advisor root dispatch, Inbox thread id, integration branch, landing decision, verify round and outcome, then per ticket `#N status dispatch branch sha` with status in `queued | running | asking | done | merged | human`. It is the cheap map [RESUME.md](RESUME.md) rebuilds from; the tracker, git, and Orca are the sources of truth.
+Keep `$F/state.md` current at every milestone, one line per item: run id, advisor root dispatch, Inbox thread id, integration branch, landing and remote decisions, per repo its integration worktree path, verify round and outcome, then per ticket `#N repo status dispatch branch sha` with status in `queued | running | asking | done | merged | human`. It is the cheap map [RESUME.md](RESUME.md) rebuilds from; the tracker, git, and Orca are the sources of truth.
 
 ## Landing and cleanup
 
-1. Full test suite and app build green on the integration branch.
-2. Land per step 0 (the `pr` skill writes the PR body; reference every agent ticket with `Closes #N`). Leave `ready-for-human` tickets and any parent/map issue open, and say so. With a PR: pass its ref as `pulls` on the final summary message, then run `plannotator inbox export-decisions --thread <thread id> --pr <ref>` so the user's decisions sit on the PR.
-3. For each implementer worktree, confirm its branch is an ancestor of the integration branch, then `orca worktree rm --worktree path:<abs path> --delete-branch`. Release the advisor with `worker-release`.
+1. In each repo's integration worktree: full test suite and build green.
+2. Land per step 0, repo by repo in the order the tickets depend on each other:
+   - PR: one per repo; the `pr` skill writes each body, references the PRs of the other repos, and closes that repo's agent tickets (`Closes #N`, qualified as `<owner>/<home repo>#N` when the tracker lives in another repo). Pass every PR ref as `pulls` on the final summary message, then run `plannotator inbox export-decisions --thread <thread id> --pr <ref>` for each PR so the user's decisions sit on it.
+   - Merge: `git merge --ff-only <spec-slug>-impl` in the repo's main checkout when it is on its base branch and clean; otherwise a `:::action` in the Inbox thread naming the repo and the command.
+
+   Leave `ready-for-human` tickets and any parent/map issue open, and say so.
+3. Cleanup. For each implementer worktree, in its repo, confirm its branch is an ancestor of the integration branch, then `orca worktree rm --worktree path:<abs path> --delete-branch`. PR or merge: remove each integration worktree with `orca worktree rm --worktree path:<abs path>`, keeping its branch. Local: keep the integration worktrees and list their paths in the final summary. Release the advisor with `worker-release`.
 
 ## Reporting
 

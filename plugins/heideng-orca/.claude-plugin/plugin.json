@@ -1,6 +1,6 @@
 {
   "name": "heideng-orca",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Spec to implemented code, unattended after one landing question: tickets then implementation, every subagent an Orca worker, skill questions answered by an Orca advisor worker, human decisions collected in the Plannotator Inbox.",
   "dependencies": [
     "mattpocock-skills@mattpocock",
