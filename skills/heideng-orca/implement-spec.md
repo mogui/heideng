@@ -19,13 +19,14 @@ Every subagent is an Orca worker with a fresh context window. Communication to a
    - `__HOME_DIR__` the home repo's integration worktree; `__SPEC_PATH__` the spec inside it.
    - `__TICKET_READ_CMD__` the read operation of `docs/agents/issue-tracker.md`, written to work from any repo's worktree: the tracker named explicitly, or the ticket file's absolute path.
    - `__CHECKOUTS__` one line `<repo name>: <path>` per repo: the ticket's own repo says "this worktree", every other repo its integration worktree.
-   - `__FEATURE_FILES__` the feature files of the acceptance criteria the ticket covers. Drop rule 4 for the skeleton, which runs before `V`, and for a ticket whose chain continues in another repo.
+   - `__FEATURE_FILES__` the feature files of the acceptance criteria the ticket covers. Drop rule 5 for the skeleton, which runs before `V`, and for a ticket whose chain continues in another repo.
+   - `__CONVENTIONS__` one line per entry of `docs/agents/code-conventions.md` ([Code conventions](SKILL.md#code-conventions)) whose "applies to" matches the ticket's content: what the worker does and its target (invoke skill `<name>`, read `<absolute path in __HOME_DIR__>`, open `<url>`, apply `<rule text>`). No matching entry: drop the conventions block.
 
    `V` uses `$F/specs/V.md` as written by to-tickets.
 
 5. Launch every frontier ticket in parallel, one **implementer worker** per ticket, `V` included: a worktree ([Worktrees](SKILL.md#worktrees)) in the ticket's repo, name and branch `<slug>-t<N>`, from `<spec-slug>-impl`; then `worker-start --agent claude --worktree path:<path> --spec-file $F/specs/<N>.md`.
 
-6. On each `worker_done`: merge the branch into its repo's integration worktree (see Merging), append the feature-file updates it reports to `$F/notes/verify-updates.md`, recompute the frontier, launch the newly unblocked tickets. `V`'s edits to `.claude/skills/verify/` merge like any ticket.
+6. On each `worker_done`: check that it lists every convention of its `__CONVENTIONS__` as loaded; on a miss, `send` the worker the missing ones and wait for its next `worker_done`. Then merge the branch into its repo's integration worktree (see Merging), append the feature-file updates it reports to `$F/notes/verify-updates.md`, recompute the frontier, launch the newly unblocked tickets. `V`'s edits to `.claude/skills/verify/` merge like any ticket.
 
 7. Once every agent ticket is merged, start two read-only **review workers** in parallel, `--worktree current`: one runs `code-review`, one runs `ponytail-review`, each on the integration branch vs its base in every repo the tickets touched (paths from `state.md`). Each writes `$F/review/<skill>.md` with one section per repo. They may start while only docs-only tickets remain.
 

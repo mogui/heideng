@@ -35,6 +35,10 @@ Mark the **skeleton**: the first tracer bullet, after which the app launches and
 
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand-contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
 
+**Large components split by responsibility.** A **large component** is a part of the spec (a document, a section, a module) whose implementation exceeds the size cap below. After the skeleton, split it into one ticket per responsibility: for example data models, persistence, startup and checks, error handling, test support. Each ticket proves itself with its own tests and is chained to the others by blocking edges in the order the responsibilities build on each other.
+
+**Size cap.** Estimate each ticket's lines added, files touched, and acceptance criteria. Indicative cap: about 800 lines, 15 files, 8 criteria. A ticket above the cap is split, or carries a one-line justification in the draft.
+
 ## 4. Draft the verify ticket
 
 Add the **verify ticket** `V` to the breakdown, with `Repo:` the home repo, where `.claude/skills/verify/` lives. It blocks every other agent ticket except the skeleton. The verify skill takes the path of each repo checkout as a parameter and hardcodes none: the same skill drives the system from a ticket's worktree plus the integration worktrees of the other repos.
@@ -56,10 +60,12 @@ Write the proposed breakdown to `$F/tickets/draft.md` as a numbered list, `V` in
 - **Repo**: the repo the ticket changes
 - **Blocked by**: which other tickets (if any) must complete first
 - **What it delivers**: the end-to-end behaviour this ticket makes work
+- **Size**: estimated lines added, files touched, criteria; the justification when above the cap
 
 Ask the advisor:
 
-- Does the granularity feel right? (too coarse / too fine)
+- Is every ticket within the size cap, or justified? Is every large component split by responsibility?
+- Does any acceptance criterion point at a document instead of listing its content?
 - Are the blocking edges correct: does each ticket only depend on tickets that genuinely gate it?
 - Should any tickets be merged or split further?
 - Does every acceptance criterion of the spec land in a ticket?
@@ -120,5 +126,7 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 - A reference to each blocking ticket, or "None (can start immediately)". Omit this section when blockers were set as native edges.
 
 </issue-template>
+
+**Acceptance criteria list the content of the spec they cover.** Each criterion is one verifiable item from the part of the spec the ticket covers: a behaviour, an error case, a test, or a type, class or endpoint the spec names. A criterion that points at a document ("complete as described in X") is not a criterion: replace it with the items X lists.
 
 In either form, avoid specific file paths or code snippets: they go stale fast. Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note briefly that it came from a prototype. Trim to the decision-rich parts, not a working demo, just the important bits.

@@ -33,6 +33,19 @@ The spec's `## Repos` section is the index of the repos the run touches: one lin
 
 `repos.md`, beside the spec, is derived from that index at step 0 and committed on the home repo's integration branch. One line per repo: name, Orca id, absolute path of the main checkout, base branch, build command, test command. Build and test come from the repo (README, package manifest, scripts), or from the spec for a repo with no code yet. Tickets, workers, and [RESUME.md](RESUME.md) read it.
 
+## Code conventions
+
+`docs/agents/code-conventions.md`, in the home repo, lists the project's code conventions. One entry per convention: **category** (tests, exceptions, observability, ...), **applies to** (stack, repo, or kind of work), **form** with its target:
+
+| Form | Target | The worker |
+|---|---|---|
+| skill | a skill declared in `souk.yaml`, so present in every worktree | invokes it with the `Skill` tool |
+| file | a path inside the home repo | reads it |
+| link | a URL | opens it |
+| criteria | the rule text itself | applies it |
+
+A convention that lives in a skill outside `souk.yaml` (local to the home repo) is recorded as files: its `SKILL.md` and the documents it points to for that category. A project without the file runs without conventions.
+
 ## Worktrees
 
 Every worktree the run creates is ready before an agent runs in it:
@@ -48,6 +61,7 @@ Ask the user once, in one message:
 - How finished work lands, for every repo alike: push each integration branch (recommended), merge to each base branch, or keep it local.
 - For each `nuovo` repo: create its remote, or keep it local.
 - When the spec has no `## Repos` but reads as several components (services, apps, libraries to create): the `## Repos` you propose. Rejected: single-repo run.
+- When the home repo has no `docs/agents/code-conventions.md`: the project's [code conventions](#code-conventions). Search the spec and the project (`CLAUDE.md`/`AGENTS.md` of every repo, the home repo's skills, docs), propose the entries you find, and ask which work each applies to.
 
 This is the only outward-facing step; settling it now keeps the end of the run unattended. Then:
 
@@ -55,10 +69,11 @@ This is the only outward-facing step; settling it now keeps the end of the run u
 2. Each repo: append to `$(git -C <repo> rev-parse --git-common-dir)/info/exclude`, shared by all its worktrees, the lines missing among `souk.yaml`, `souk.lock`, and `.claude/skills/<name>/` for each resource in `souk.lock`. Workers then never commit the souk files.
 3. Each repo: its **integration worktree** ([Worktrees](#worktrees)), name `<spec-slug>-impl-<repo name>`, branch `<spec-slug>-impl`, from its base branch. Copy pending agent-config files from the main checkout into it and commit them there.
 4. In the home repo's integration worktree: the approved `## Repos` added to the spec, `repos.md` written, one commit.
+5. Conventions answered: in the home repo's integration worktree, write `docs/agents/code-conventions.md` ([Code conventions](#code-conventions)) and a line pointing to it in the `## Agent skills` block, one commit.
 
 From here on, "the spec" is the copy in the home repo's integration worktree; every path to it you hand a worker is that one.
 
-Done: landing decision, remote decisions, and every integration worktree path written to `state.md`.
+Done: landing decision, remote decisions, and every integration worktree path written to `state.md`; `docs/agents/code-conventions.md` present when the project has conventions.
 
 ## 1. Advisor
 
