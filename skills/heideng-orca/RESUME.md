@@ -1,6 +1,6 @@
 # Resuming a heideng-orca run
 
-The run outlives any one coordinator context. Scratch dir `$F` as in SKILL.md. Rebuild the picture from the sources of truth, reconcile, then continue the normal loop in SKILL.md. Done when every ticket has exactly one status and every active worker is watched.
+The run outlives any one coordinator context. Work dir `$F` as in SKILL.md. Rebuild the picture from the sources of truth, reconcile, then continue the normal loop in SKILL.md. Done when every ticket has exactly one status and every active worker is watched.
 
 ## 1. Read the state
 

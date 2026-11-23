@@ -20,12 +20,13 @@ All hold before step 0; on a miss, stop and tell the user the fix.
 - `orca --version` works and the `orchestration` skill is available (both ship with the Orca app). Load `orchestration` once and follow its run/worker/ask protocol for everything below.
 - `souk --version` works, and the home repo's `souk.yaml` and `souk.lock` pass `souk sync --check`. They declare this skill and the skills workers use: `tdd`, `code-review`, `pr`, `ponytail-review`, `create-verification-skill`, `maintain-verification-skill` (fix: `souk init` if there is no `souk.yaml`, then `souk registry add heideng https://github.com/mogui/heideng` and `souk presets apply heideng`).
 - The `plannotator_inbox` tool is available (fix: `claude plugin marketplace add backnotprop/plannotator`, `claude plugin install plannotator@plannotator`, restart Claude Code). Run `plannotator inbox --help` once and follow it for block syntax, threads and replies.
-- You run in the **home repo**: the one holding the spec, and whose `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`).
+- You run in the **home repo**: the one holding the spec, and whose `CLAUDE.md` or `AGENTS.md` has an `## Agent skills` block (fix: `/setup-matt-pocock-skills`; for a local-markdown tracker, tell it the root is `.heideng/`).
+- A local-markdown tracker in `docs/agents/issue-tracker.md` is rooted at `.heideng/` (fix: replace `.scratch/` with `.heideng/` in that file).
 - Every `esistente` repo of the spec's `## Repos` ([Repos](#repos)), and the home repo, is in `orca repo list --json` (fix: `orca repo add --path <abs path>`).
 - No repo other than the home repo has its own `souk.yaml` (fix: merge its declarations into the home repo's `souk.yaml` by hand).
 - Each such repo with a `.claude/settings.local.json`: tell the user that workers do not see it (new worktrees lack git-ignored files); protections workers need belong in `~/.claude/settings.json`. A warning, not a stop.
 
-**Scratch dir** `$F` = `/tmp/<home repo dir name>-factory/`, with `tickets/`, `specs/`, `notes/`, `review/`, and `state.md` ([Ledger](#ledger)). Workers run in other worktrees: every scratch path you hand to a worker or a CLI flag is absolute.
+**Work dir** `$F` = `<home repo main checkout>/.heideng/<spec-slug>/factory/`, beside the local tracker's `issues/`, with `tickets/`, `specs/`, `notes/`, `review/`, and `state.md` ([Ledger](#ledger)). It is git-ignored (step 0). Workers run in other worktrees: every work dir path you hand to a worker or a CLI flag is absolute.
 
 ## 0. Landing and repos
 
@@ -39,7 +40,7 @@ Ask the user once, in one message:
 This is the only outward-facing step; settling it now keeps the end of the run unattended. Then:
 
 1. Each `nuovo` repo: a sibling directory of the home repo, `git init`, one empty commit on `main`, `orca repo add --path <abs path>`; its remote, if approved.
-2. Each repo: append to `$(git -C <repo> rev-parse --git-common-dir)/info/exclude`, shared by all its worktrees, the lines missing among `souk.yaml`, `souk.lock`, and `.claude/skills/<name>/` for each resource in `souk.lock`. Workers then never commit the souk files.
+2. Each repo: append to `$(git -C <repo> rev-parse --git-common-dir)/info/exclude`, shared by all its worktrees, the lines missing among `souk.yaml`, `souk.lock`, and `.claude/skills/<name>/` for each resource in `souk.lock`. In the home repo also `.heideng/*/factory/`. Workers then never commit the souk files or the work dir.
 3. Each repo: its **integration worktree** ([Worktrees](#worktrees)), name `<spec-slug>-impl-<repo name>`, branch `<spec-slug>-impl`, from its base branch. Copy pending agent-config files from the main checkout into it and commit them there.
 4. In the home repo's integration worktree: the approved `## Repos` added to the spec, `repos.md` written, one commit.
 5. Conventions answered: write them as [conventions.md](conventions.md) describes.

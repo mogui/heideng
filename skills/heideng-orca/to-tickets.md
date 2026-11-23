@@ -2,7 +2,7 @@
 
 Break the spec into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it, plus one **verify ticket** `V`.
 
-`$F` is the scratch dir of SKILL.md. The issue tracker and triage label vocabulary come from the home repo's `## Agent skills` block.
+`$F` is the work dir of SKILL.md. The issue tracker and triage label vocabulary come from the home repo's `## Agent skills` block.
 
 ## 1. Gather context
 
@@ -80,7 +80,7 @@ The advisor writes its verdict to `$F/tickets/review.md`. Apply the changes and 
 
 Publish the approved tickets. **How** depends on the configured tracker; the tickets are the same either way, only the shape of the blocking edges changes:
 
-- **Local files** → write one file per ticket under `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first). Each file's "Blocked by" lists the numbers/titles it depends on. Use the per-ticket file template below: one ticket per file, never a single combined file.
+- **Local files** → write one file per ticket under `.heideng/<spec-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first). Each file's "Blocked by" lists the numbers/titles it depends on. Use the per-ticket file template below: one ticket per file, never a single combined file.
 - **A real issue tracker (GitHub, Linear, ...)** → publish one issue per ticket in dependency order (blockers first) so each ticket's blocking edges can reference real identifiers. Use the platform's native blocking relationship where it has one (older `gh` lacks `--blocked-by`: use the dependencies API from `docs/agents/issue-tracker.md`); otherwise set each ticket's "Blocked by" to the blocking issues. If the source was an existing issue, make each ticket its sub-issue (tracker doc's operation).
 
 Apply the `ready-for-agent` triage label. Tickets needing a real login or GUI get `ready-for-human` and stay outside the implement graph.
