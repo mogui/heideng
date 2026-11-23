@@ -23,7 +23,7 @@ Each ticket is checked against the integration branch of its own repo.
 - Integration worktree missing while its branch exists: a worktree ([Worktrees](SKILL.md#worktrees)) with branch `<spec-slug>-impl-resume` from `<spec-slug>-impl`, then in it `git switch <spec-slug>-impl` and `git branch -D <spec-slug>-impl-resume`; record the path in `state.md`.
 - On the integration branch: `merged`.
 - Branch exists, `worker_done` received, not on the integration branch: merge it (Merging in implement-spec.md).
-- Dispatch live with an unanswered `question`: route it to the advisor; answered but parked: verify the wake (Supervision).
+- Unanswered `NEEDS USER` question from the advisor: to the Inbox thread (Human inbox in SKILL.md). Answered but the implementer parked: verify the wake (Supervision in SKILL.md).
 - Ticket `asking` on an Inbox question: answered in the thread: relay it (Human inbox in SKILL.md); still open: leave it waiting.
 - Dispatch live and working: watch it.
 - Dispatch gone without `worker_done`, branch has a ticket commit: build + tests on the branch; green: merge it; red: restart.
